@@ -73,14 +73,10 @@ open(f"{out}/wind-front.svg", "w").write(svg(front))
 
 preview = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{W}" viewBox="0 0 {W} {W}">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#6BC6F0"/>
-      <stop offset="1" stop-color="#1E6BC8"/>
-    </linearGradient>
     <clipPath id="squircle"><rect x="0" y="0" width="{W}" height="{W}" rx="232"/></clipPath>
   </defs>
   <g clip-path="url(#squircle)">
-    <rect width="{W}" height="{W}" fill="url(#bg)"/>
+    <rect width="{W}" height="{W}" fill="#0E5A50"/>
     <path d="{back}" fill="#FFFFFF" opacity="0.72"/>
     <path d="{mid}" fill="#FFFFFF" opacity="1.0"/>
     <path d="{front}" fill="#FFFFFF" opacity="0.85"/>

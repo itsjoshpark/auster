@@ -15,12 +15,14 @@ doc.
 `Auster/MenuBar/StatusIcon.swift`, `Auster/MenuBar/RecentChangesSection.swift`;
 modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift`.
 
-- [ ] `StatusIcon.symbol(for: SyncState.Status, hasSyncErrors: Bool) -> String`
-  mapping per ux §1 (template SF Symbols; syncing uses
-  `arrow.triangle.2.circlepath` with `.symbolEffect(.rotate)`, idle
-  `checkmark.circle`, paused `pause.circle`, connecting `circle.dotted`,
-  sync-error `exclamationmark.triangle`, fatal `xmark.circle`). TDD the mapping
-  incl. "error badge only when idle" rule (engine-doc §10 / cocoa behavior).
+- [ ] `StatusIcon.assetName(for: SyncState.Status, hasSyncErrors: Bool) -> String`
+  mapping per ux §1 onto the custom template icons in `design/MenuBarIcon/`
+  (add the five SVGs to `Assets.xcassets` as **template** images, rendered at
+  18×18 pt): idle → `menubar-idle`, syncing/indexing → `menubar-syncing`,
+  paused → `menubar-paused`, sync-error and fatal → `menubar-error`,
+  connecting → `menubar-offline`. TDD the mapping incl. the "error badge only
+  when idle" rule (engine-doc §10 / cocoa behavior). Syncing stays static in
+  v1 (see `design/MenuBarIcon/README.md`).
 - [ ] `MenuBarExtra` window content, top→bottom per ux §2: Open Dropbox Folder /
   Launch Dropbox Website / divider / email + usage rows / divider / status row
   (+ inline activity progress rows when syncing, ≤ 5, from `state.activity`) /

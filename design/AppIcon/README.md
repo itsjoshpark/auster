@@ -8,7 +8,8 @@ shadows.
 **Concept:** Auster is the Latin south wind. A wind glyph drafted from clean
 primitives — three thick horizontal gusts built from straight segments joined
 tangent-continuously to perfect circular-arc curls, uniform stroke width,
-round caps — over an azure gradient. No text, legible down to 16 px.
+round caps — over a solid deep sea-green field (`#0E5A50`, chosen by Josh
+2026-08-22). No text, legible down to 16 px.
 
 ![preview](preview@512.png)
 
@@ -22,11 +23,13 @@ round caps — over an azure gradient. No text, legible down to 16 px.
 | `generate.py` | Regenerates the layer SVGs (parametric geometry) |
 
 The `.icon` document already encodes what the HIG says to configure in Icon
-Composer: background as a native vertical linear gradient (`#6BC6F0 → #1E6BC8`),
-layers ordered front → back (`wind-front` 85%, `wind-middle` 100%, `wind-back`
-72%), default Liquid Glass settings (neutral shadow, translucency), square
-canvases shared across platforms. Layer files stay fully opaque; opacity lives
-in `icon.json` per the HIG.
+Composer: a solid `#0E5A50` background (expressed in `icon.json` as an
+equal-stop gradient — the verified schema; switch it to a native solid fill in
+Icon Composer's inspector if preferred, same result), layers ordered front →
+back (`wind-front` 85%, `wind-middle` 100%, `wind-back` 72%), default Liquid
+Glass settings (neutral shadow, translucency), square canvases shared across
+platforms. Layer files stay fully opaque; opacity lives in `icon.json` per the
+HIG.
 
 > `icon.json` was authored by hand against the published format (validated
 > against several real Icon Composer documents). The first time you open it in
@@ -36,10 +39,10 @@ in `icon.json` per the HIG.
 ## Appearance variants
 
 Default is fully specified. Dark/clear/tinted are left to the system to derive
-(HIG-sanctioned); if the dark variant needs tuning, set a dark background
-override in Icon Composer of `#123E63 → #0A2540` and keep the white glyphs
-unchanged. Preview all appearances and small sizes (16/32 px) in Icon Composer
-before shipping.
+(HIG-sanctioned); the background is already dark, so the dark variant should
+need no override — if tuning is wanted, set a darker solid `#08332D` in Icon
+Composer and keep the white glyphs unchanged. Preview all appearances and
+small sizes (16/32 px) in Icon Composer before shipping.
 
 ## Regenerating / tweaking
 
@@ -56,7 +59,7 @@ optical-centering shifts) is parametrized at the bottom of the script.
 - [x] Fully opaque layer files; transparency applied in the Icon Composer document
 - [x] Hard, clearly defined edges (no feathering/soft edges)
 - [x] No baked speculars, shadows, bevels, glows, or blurs
-- [x] Simple background (gradient) defined in the document, not an image
+- [x] Simple background (solid color) defined in the document, not an image
 - [x] Primary content centered; safe margins (~200 px) respected
 - [x] Consistent core features across default/dark/clear/tinted appearances
 - [x] Legible at small sizes (verified at 64 px and 16 px equivalents)
