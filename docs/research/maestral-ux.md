@@ -95,7 +95,7 @@ content:
 - **Account**: profile picture, name, email + plan, space usage, Unlink button
   (confirmation: unlink keeps local files, stops syncing, forgets account).
 - **About**: icon, version, link to repo, Check for Updates (Sparkle).
-(Bandwidth limits are deferred — see decisions.md.)
+(Maestral's bandwidth-limit settings are permanently out of scope — decisions D4.)
 
 Changing the folder location moves the existing folder (`FileManager.moveItem`) and
 updates config; on failure or existing target, alert.

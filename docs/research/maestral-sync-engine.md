@@ -90,7 +90,9 @@ anything else → notify user, stop sync.
 
 1. Verify the local Dropbox folder still exists (see §9 for the folder-missing case).
 2. Fetch space usage / account info.
-3. (Team accounts) check path-root changes — Auster v1 skips this (see decisions).
+3. (Team accounts) Maestral checked for path-root changes here — Auster does not
+   support team accounts at all (decisions D4); they are rejected at link time, so
+   this step is omitted.
 4. Retry every path in the download-errors list (fetch each item fresh).
 5. Drain the persistent pending-downloads queue.
 6. Run one full **download sync cycle** (§4). If the remote cursor is empty, this is

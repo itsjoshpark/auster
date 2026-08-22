@@ -15,7 +15,7 @@ auster/
 ├── Auster/                     # app sources
 │   ├── AusterApp.swift         # @main: MenuBarExtra + Settings scenes, onOpenURL
 │   ├── MenuBar/                # menu bar window views + status icon logic
-│   ├── Settings/               # settings tabs (General, Selective Sync, Account, About)
+│   ├── SettingsUI/             # settings tabs (General, Selective Sync, Account, About)
 │   ├── Onboarding/             # setup wizard window
 │   ├── Windows/                # Recent Changes, Sync Issues windows
 │   ├── Support/                # notifications, login item, Sparkle glue, Finder reveal
@@ -94,8 +94,7 @@ CoreServices/FSEvents only, plus deps). The app target contains no sync logic.
 Per research/dropbox-api-notes §1: `setupWithAppKeyDesktop` at launch;
 `authorizedClient != nil` decides wizard vs normal startup. Wizard link page runs
 `authorizeFromControllerV2`; `.onOpenURL` → `handleRedirectURL`. After linking:
-fetch account (reject team accounts with a friendly "not yet supported" page —
-D4), pick folder (merge/create), initial selective-sync tree, then coordinator
+fetch account (reject team accounts with a friendly "Not supported" page — D4), pick folder (merge/create), initial selective-sync tree, then coordinator
 start. Unlink (settings): stop sync, `unlinkClients()`, wipe DB + cursors, keep
 local files, relaunch into wizard.
 

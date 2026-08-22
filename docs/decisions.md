@@ -9,8 +9,13 @@ A real local folder (default `~/Dropbox`, user-choosable) kept in two-way sync b
 our own engine: FSEvents for local changes, Dropbox longpoll/delta for remote
 changes; all included files always on disk.
 **Rejected:** `NSFileProviderReplicatedExtension` (Finder-integrated, on-demand
-materialization). Reasons: much harder API and debugging story, diverges from
-Maestral's UX, and full-local files are the product goal.
+materialization) — revisited and re-rejected 2026-08-22. Reasons: files would be
+forced into the system-managed `~/Library/CloudStorage/` domain (no user-chosen
+plain `~/Dropbox` folder — the core product promise); it only replaces the local
+half of the engine while making conflict handling fit a constrained system model;
+and extension debugging against the opaque `fileproviderd` daemon is
+interactive-debugging-shaped and untestable headless. The FSEvents engine is
+deterministic and fully testable in a temp directory.
 
 ## D2. Distribution: direct download, Developer ID + notarization, Sparkle updates
 No App Sandbox (a free-form sync folder + full-disk file access make sandboxing
@@ -28,10 +33,12 @@ when implementation reaches auth.
 **In:** core two-way sync, onboarding wizard with browser OAuth, menu bar UI,
 Settings window, selective sync, desktop notifications + recent-activity list,
 sync-issues list, pause/resume, start-at-login, rebuild index.
-**Deferred (v2+):** bandwidth/rate limits, multiple accounts, `.mignore` ignore
-files, CLI, Dropbox **team/business** namespace handling (team spaces, path-root
-migration — v1 targets personal accounts; detect team accounts at link time and
-show "not yet supported"), batch API optimizations.
+**Out of scope — permanently (per Josh, 2026-08-22):** bandwidth/rate limits,
+multiple accounts, `.mignore` ignore files, CLI, Dropbox **team/business**
+accounts (team spaces, path-root migration). These will never be implemented; do
+not design abstractions or leave hooks for them. Auster targets personal accounts
+only — detect team accounts at link time and show "**Not supported**" (not "not
+yet supported"). Batch API calls remain a possible future optimization.
 
 ## D5. Target: macOS 15+, SwiftUI, Swift 6 strict concurrency
 Frees `MenuBarExtra`, `Settings` scene, `@Observable`, mature structured
