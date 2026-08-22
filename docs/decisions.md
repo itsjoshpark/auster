@@ -42,7 +42,9 @@ yet supported"). Batch API calls remain a possible future optimization.
 
 ## D5. Target: macOS 15+, SwiftUI, Swift 6 strict concurrency
 Frees `MenuBarExtra`, `Settings` scene, `@Observable`, mature structured
-concurrency. Xcode 16+.
+concurrency. Xcode 26+ (Icon Composer `.icon` app-icon support; deployment
+target remains macOS 15 — Icon Composer exports fallback renderings for
+pre-Tahoe systems).
 
 ## D6. Architecture: single app, layered core (no daemon/GUI split)
 One menu-bar app embedding the engine as a local Swift Package **AusterCore** with

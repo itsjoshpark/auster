@@ -26,7 +26,7 @@ team/business accounts.
 ## Requirements
 
 - macOS 15 (Sequoia) or later
-- Xcode 16+ to build
+- Xcode 26+ to build
 - A Dropbox API app key (development builds; see
   `Config/Secrets.xcconfig.template` once scaffolding lands)
 

@@ -21,7 +21,8 @@ onboarding wizard) observing an `@Observable` state object. See
 [design.md](design.md).
 
 **Tech stack:** Swift 6 (strict concurrency), SwiftUI, macOS 15+, SwiftyDropbox,
-GRDB, Sparkle. Xcode 16+.
+GRDB, Sparkle. Xcode 26+ (needed for the Icon Composer `.icon` app icon;
+deployment target stays macOS 15).
 
 **Spec:** [design.md](design.md) — the plan argues from it; read it first.
 
