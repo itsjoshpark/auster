@@ -75,7 +75,8 @@ mid = outline(
 front = outline(
     sample_centerline((296, 678), (500, 660), (628, 626), curl=None), h=31)
 
-out = os.path.join(os.path.dirname(__file__), "icon")
+here = os.path.dirname(os.path.abspath(__file__))
+out = os.path.join(here, "AppIcon.icon", "Assets")
 os.makedirs(out, exist_ok=True)
 open(f"{out}/wind-back.svg", "w").write(svg(back))
 open(f"{out}/wind-middle.svg", "w").write(svg(mid))
@@ -97,5 +98,5 @@ preview = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{W}" v
   </g>
 </svg>
 '''
-open(f"{out}/preview.svg", "w").write(preview)
+open(os.path.join(here, "preview.svg"), "w").write(preview)
 print("ok")

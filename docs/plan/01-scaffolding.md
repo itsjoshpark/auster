@@ -39,10 +39,11 @@ placeholder `Text("Auster")`, and an empty `Settings` scene.
 - [ ] `Secrets.xcconfig.template` documents `DROPBOX_APP_KEY = <ask Josh>`;
   `Shared.xcconfig` includes it optionally (`#include? "Secrets.xcconfig"`). Build
   must succeed without the real key (auth phases need it at runtime only).
-- [ ] App icon: icon source artwork lives in `Design/AppIcon/` (see its README).
-  If `AppIcon.icon` (the Icon Composer export) exists in the repo, set it as the
-  app icon in the target settings; otherwise ask Josh to export it from Icon
-  Composer per `Design/AppIcon/README.md` — not a blocker for this phase.
+- [ ] App icon: the Icon Composer document lives at
+  `design/AppIcon/AppIcon.icon` (see `design/AppIcon/README.md`). Add it to the
+  project and set it as the app icon in the target settings (Xcode 26 consumes
+  `.icon` directly). Ask Josh to open it once in Icon Composer to visually
+  verify and re-save — not a blocker for this phase.
 - [ ] Build and launch; menu bar icon appears; no Dock icon. Commit.
 
 ### Task 1.3: Build/test scripts

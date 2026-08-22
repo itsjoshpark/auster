@@ -9,8 +9,9 @@ order (design → decisions → research docs), the global constraints, and the
 10-phase implementation plan in `docs/plan/`. Work phases in order; check off
 `- [ ]` boxes in the phase files as you go and commit them with the code.
 
-The docs are self-contained: everything learned from Maestral and the Dropbox
-API is captured in `docs/research/`. Do not go looking for Maestral's source.
+The docs are self-contained: the sync-engine algorithms, Dropbox API notes,
+and the UX spec are all captured in `docs/research/` — everything you need is
+in this repo.
 
 ## Hard rules
 
