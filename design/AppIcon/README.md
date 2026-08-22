@@ -5,9 +5,10 @@ guidance last refined 2026-06-08): layered, vector, unmasked square canvas,
 no baked-in effects — the system supplies specular highlights, refraction, and
 shadows.
 
-**Concept:** Auster is the Latin south wind. Three tapered gusts — the longest
-curling into a spiral — over an azure gradient. Filled overlapping shapes,
-no text, legible down to 16 px.
+**Concept:** Auster is the Latin south wind. A wind glyph drafted from clean
+primitives — three thick horizontal gusts built from straight segments joined
+tangent-continuously to perfect circular-arc curls, uniform stroke width,
+round caps — over an azure gradient. No text, legible down to 16 px.
 
 ![preview](preview@512.png)
 
@@ -21,9 +22,9 @@ no text, legible down to 16 px.
 | `generate.py` | Regenerates the layer SVGs (parametric geometry) |
 
 The `.icon` document already encodes what the HIG says to configure in Icon
-Composer: background as a native vertical linear gradient (`#5BBCE9 → #1C67B8`),
-layers ordered front → back (`wind-front` 80%, `wind-middle` 100%, `wind-back`
-62%), default Liquid Glass settings (neutral shadow, translucency), square
+Composer: background as a native vertical linear gradient (`#6BC6F0 → #1E6BC8`),
+layers ordered front → back (`wind-front` 85%, `wind-middle` 100%, `wind-back`
+72%), default Liquid Glass settings (neutral shadow, translucency), square
 canvases shared across platforms. Layer files stay fully opaque; opacity lives
 in `icon.json` per the HIG.
 
@@ -44,8 +45,8 @@ before shipping.
 
 `python3 generate.py` rewrites `AppIcon.icon/Assets/*.svg` and `preview.svg`
 (render the PNG preview with `qlmanage -t -s 512 -o . preview.svg`). Stroke
-geometry (sweep curves, spiral radius/angle, widths, taper) is parametrized at
-the bottom of the script.
+geometry (run lengths, curl radii/sweep, stroke width, vertical rhythm,
+optical-centering shifts) is parametrized at the bottom of the script.
 
 ## HIG conformance checklist
 
