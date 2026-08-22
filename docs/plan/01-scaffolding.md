@@ -43,8 +43,9 @@ placeholder `Text("Auster")`, and an empty `Settings` scene.
 
 ### Task 1.3: Build/test scripts
 
-**Files:** create `Scripts/build.sh`, `Scripts/test.sh`, `README.md` (how to
-build, where the app key goes, doc map pointer to `docs/PLAN.md`).
+**Files:** create `Scripts/build.sh`, `Scripts/test.sh`; modify `README.md`
+(replace the placeholder "Building" section with real instructions: scripts,
+where the app key goes).
 
 - [ ] `test.sh` runs `swift test --package-path AusterCore` then
   `xcodebuild -project Auster.xcodeproj -scheme Auster build`. Both scripts pass.
