@@ -54,7 +54,8 @@ GRDB, Sparkle. Xcode 16+.
   in gitignored `Config/Secrets.xcconfig` (template committed).
 - App name "Auster"; cache dir `.auster.cache`; local folder default `~/Dropbox`.
 - TDD throughout (test first, red, green, commit). Commit at every green step;
-  imperative-mood messages, no attribution footers.
+  **Conventional Commits** messages (`feat:`/`fix:`/`docs:`/`chore:`/`test:`/
+  `refactor:`), imperative mood, no attribution footers.
 
 ## Phases
 
