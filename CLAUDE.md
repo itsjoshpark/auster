@@ -24,8 +24,9 @@ in this repo.
 - Dependencies: SwiftyDropbox, GRDB, Sparkle only. Anything else: ask Josh.
 - TDD: failing test first, then code, then commit. Swift 6 language mode with
   zero concurrency warnings.
-- **Conventional Commits** for every commit message (`feat:`, `fix:`, `docs:`,
-  `chore:`, `test:`, `refactor:`). Imperative mood, no attribution footers.
+- **Conventional Commits** for every commit message AND every PR title
+  (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`). Imperative mood,
+  no attribution footers.
 - Never commit secrets. The Dropbox app key lives in gitignored
   `Config/Secrets.xcconfig` — ask Josh for the key when Phase 2 needs it.
 
