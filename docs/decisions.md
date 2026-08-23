@@ -476,3 +476,25 @@ and both failures were in the *test doubles*, not the engine:
 `IntegrationScope.make()` also replaces `init()` at the call sites, so each
 scope's remote folder exists before a test lists it — Dropbox creates parents
 implicitly on upload, which is why the gap went unnoticed.
+
+### N40. Clearing a sync issue is per path, not per subtree (Phase 9 follow-up)
+`SyncEngine.record` cleared errors with `clearSyncErrors(pathLower:)`, which
+deletes the whole subtree. The comment on that method — "re-syncing a folder
+should clear the issues of the children it is about to retry" — describes a case
+that does not hold in the upload direction: a folder event syncs the folder, not
+what is in it, and a folder whose upload *skips* retries nothing at all.
+
+Found live. A read-only folder failed a child's download and recorded an issue;
+restoring the permission fired an FS event for the folder, whose upload skipped
+and took the child's issue with it. The file then existed on Dropbox, was absent
+from disk and from the index, and the interface reported no sync issues — with
+nothing left to retry, since the startup sequence builds its retry list from
+exactly those rows.
+
+`clearSyncError(exactPathLower:)` now backs the success path, except for a
+`.removed` event, where the subtree really has gone. `removeExcluded` keeps
+subtree semantics for the same reason.
+
+The clue worth remembering: the error disappeared without a history row being
+written. `recordHistory` ignores `.skipped` completions, so "issue cleared, no
+history" is the signature of an issue cleared by something that did not sync.

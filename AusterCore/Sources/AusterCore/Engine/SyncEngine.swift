@@ -219,7 +219,15 @@ public actor SyncEngine {
     ) async throws {
         do {
             let completion = try await handler()
-            try database.clearSyncErrors(pathLower: event.dbxPathLower)
+            // Per path, not per subtree: syncing a folder says nothing about
+            // the files inside it, and clearing their issues here loses both
+            // the message and the retry (note N40). A deletion is the one case
+            // that really does settle a whole subtree.
+            if event.changeType == .removed {
+                try database.clearSyncErrors(pathLower: event.dbxPathLower)
+            } else {
+                try database.clearSyncError(exactPathLower: event.dbxPathLower)
+            }
             try recordHistory(for: event, completion: completion)
             events.itemCompleted(event, completion)
         } catch let error as DropboxServiceError {
