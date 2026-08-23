@@ -151,4 +151,75 @@ extension SyncItemEvent {
             )
         }
     }
+
+    /// Builds an upload event from a cleaned filesystem event.
+    ///
+    /// Everything the far side will need is resolved here, while the file is
+    /// still in front of us: its hash, its size, whether it is a symlink, and
+    /// what the index last knew about it. The handlers then work from the event
+    /// alone, which is what lets a whole batch be hashed in parallel before any
+    /// of it is uploaded.
+    ///
+    /// Unlike the download direction there is nothing to await: local paths need
+    /// no case correction, because the disk *is* the authority on how they are
+    /// spelled.
+    public init(
+        local event: RawFSEvent,
+        index: SyncDatabase,
+        pathStore: PathStore,
+        hasher: CachedContentHasher
+    ) throws {
+        let source = try pathStore.toDbxPath(localURL: event.url)
+        let sourceLower = PathStore.normalize(source)
+
+        var destination = source
+        var destinationURL = event.url
+        if case .moved(let movedTo) = event.kind {
+            destination = try pathStore.toDbxPath(localURL: movedTo)
+            destinationURL = movedTo
+        }
+        let destinationLower = PathStore.normalize(destination)
+
+        // A move is a fact about the item at the *source*, which is where the
+        // index knows it by.
+        let indexEntry = try index.indexEntry(forPathLower: sourceLower)
+        let attributes = try? FileManager.default.attributesOfItem(atPath: destinationURL.path)
+
+        let itemType: ItemType
+        switch event.kind {
+        case .deleted:
+            // The item is gone, so the index is a better witness to what it was
+            // than an FSEvents flag about something that no longer exists.
+            itemType = indexEntry?.itemType ?? (event.isDirectory ? .folder : .file)
+        default:
+            itemType = event.isDirectory ? .folder : .file
+        }
+
+        let changeType: ChangeType
+        switch event.kind {
+        case .created: changeType = .added
+        case .deleted: changeType = .removed
+        case .modified: changeType = .modified
+        case .moved: changeType = .moved
+        }
+
+        let isMove = destinationLower != sourceLower || destination != source
+        self.init(
+            direction: .up,
+            changeType: changeType,
+            itemType: itemType,
+            dbxPath: destination,
+            dbxPathLower: destinationLower,
+            localURL: destinationURL,
+            dbxPathFrom: isMove ? source : nil,
+            dbxPathFromLower: isMove ? sourceLower : nil,
+            localURLFrom: isMove ? event.url : nil,
+            rev: indexEntry?.rev,
+            contentHash: event.kind == .deleted ? nil : try hasher.localHash(at: destinationURL),
+            symlinkTarget: try? FileManager.default.destinationOfSymbolicLink(atPath: destinationURL.path),
+            dbxId: indexEntry?.dbxId,
+            size: (attributes?[.size] as? NSNumber)?.int64Value ?? 0,
+            changeTime: attributes?[.modificationDate] as? Date
+        )
+    }
 }

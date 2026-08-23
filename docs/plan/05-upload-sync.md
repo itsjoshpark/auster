@@ -88,7 +88,7 @@ rename skip, post-move recursive index refresh), deletion guards (type-mismatch
 skips + untrack, parentRev-guarded delete, excluded-path skip, never delete when
 remote changed since lastSync).
 
-- [ ] TDD minimum set (MockDropboxService + temp dir):
+- [x] TDD minimum set (MockDropboxService + temp dir):
   new file uploads with `.add` + correct clientModified;
   modified file uploads with `.update(rev)`;
   content identical to remote → skipped, index refreshed;
@@ -101,7 +101,7 @@ remote changed since lastSync).
   local delete happy path with parentRev;
   file at user-excluded path created → renamed "(selective sync conflict)";
   two local names differing only by case → second renamed "(case conflict)".
-- [ ] Commit per green cluster.
+- [x] Commit per green cluster.
 
 ### Task 5.4: Upload cycle + catch-up scan
 
