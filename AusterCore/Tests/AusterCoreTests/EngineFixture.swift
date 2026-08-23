@@ -105,4 +105,30 @@ final class EngineFixture {
     func indexEntry(_ dbxPath: String) throws -> IndexEntry? {
         try database.indexEntry(forPathLower: PathStore.normalize(dbxPath))
     }
+
+    // MARK: - Engine helpers
+
+    /// The download event the engine would build for whatever the mock remote
+    /// currently holds at `dbxPath`.
+    func downloadEvent(_ dbxPath: String, includeDeleted: Bool = false) async throws -> SyncItemEvent {
+        guard let metadata = try await service.metadata(path: dbxPath, includeDeleted: includeDeleted) else {
+            throw DropboxServiceError.notFound(path: dbxPath)
+        }
+        return try await SyncItemEvent(remote: metadata, index: database, pathStore: pathStore)
+    }
+
+    func makeApplier(
+        ownerName: String? = "Mock User",
+        events: SyncEngineEvents = SyncEngineEvents()
+    ) -> DownloadApplier {
+        DownloadApplier(
+            service: service,
+            database: database,
+            pathStore: pathStore,
+            hasher: hasher,
+            fileOps: fileOps,
+            events: events,
+            ownerName: ownerName
+        )
+    }
 }

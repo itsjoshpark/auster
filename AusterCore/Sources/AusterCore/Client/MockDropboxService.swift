@@ -161,15 +161,47 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
 
     /// Puts a file into the remote without going through the upload path.
     @discardableResult
-    public func seedFile(at path: String, contents: String) throws -> RemoteFile {
-        try seedFile(at: path, data: Data(contents.utf8))
+    public func seedFile(at path: String, contents: String, clientModified: Date = Date()) throws -> RemoteFile {
+        try seedFile(at: path, data: Data(contents.utf8), clientModified: clientModified)
     }
 
     /// Puts a file into the remote without going through the upload path.
     @discardableResult
-    public func seedFile(at path: String, data: Data) throws -> RemoteFile {
+    public func seedFile(at path: String, data: Data, clientModified: Date = Date()) throws -> RemoteFile {
         try lock.withLock {
-            try write(data: data, to: path, mode: .overwrite, autorename: false, clientModified: Date())
+            try write(data: data, to: path, mode: .overwrite, autorename: false, clientModified: clientModified)
+        }
+    }
+
+    /// Puts a symlink into the remote.
+    ///
+    /// Dropbox stores a symlink as file metadata carrying `symlink_info`, with
+    /// no content worth downloading — which is what lets the engine reproduce it
+    /// without a transfer (engine-doc §4.6 step 4).
+    @discardableResult
+    public func seedSymlink(at path: String, target: String) -> RemoteFile {
+        lock.withLock {
+            createParents(of: path)
+            let display = Self.normalized(path)
+            let file = RemoteFile(
+                id: nodes[display.lowercased()]?.metadata.asFile?.id ?? nextID(),
+                name: Self.basename(of: display),
+                pathLower: display.lowercased(),
+                pathDisplay: display,
+                rev: nextRev(),
+                size: 0,
+                contentHash: ContentHasher.hash(data: Data()),
+                clientModified: Date(),
+                serverModified: Date(),
+                symlinkTarget: target,
+                isDownloadable: true,
+                modifiedBy: nil
+            )
+            nodes[file.pathLower] = Node(metadata: .file(file), data: Data())
+            revisions[file.rev] = (file, Data())
+            tombstones[file.pathLower] = nil
+            changeLog.append(.file(file))
+            return file
         }
     }
 
@@ -375,7 +407,9 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
             guard let source = nodes[sourceKey] else { throw DropboxServiceError.notFound(path: from) }
 
             var destination = to
-            if nodes[Self.key(for: to)] != nil {
+            // A move that only changes casing lands on its own key, and Dropbox
+            // allows it — it is how a rename to `Report.TXT` is expressed.
+            if nodes[Self.key(for: to)] != nil, Self.key(for: to) != sourceKey {
                 guard autorename else { throw DropboxServiceError.conflict(path: to) }
                 destination = availablePath(basedOn: to)
             }
@@ -396,13 +430,17 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
                 if let file = relocated.asFile { revisions[file.rev] = (file, node.data) }
             }
 
-            let tombstone = RemoteDeleted(
-                name: source.metadata.name,
-                pathLower: source.metadata.pathLower,
-                pathDisplay: source.metadata.pathDisplay
-            )
-            tombstones[sourceKey] = tombstone
-            changeLog.append(.deleted(tombstone))
+            // A case-only rename has nothing to bury: the entry is still there,
+            // just spelled differently.
+            if moved.pathLower != sourceKey {
+                let tombstone = RemoteDeleted(
+                    name: source.metadata.name,
+                    pathLower: source.metadata.pathLower,
+                    pathDisplay: source.metadata.pathDisplay
+                )
+                tombstones[sourceKey] = tombstone
+                changeLog.append(.deleted(tombstone))
+            }
             changeLog.append(moved)
             return moved
         }
@@ -485,7 +523,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
             pathDisplay: Self.normalized(target),
             rev: nextRev(),
             size: Int64(data.count),
-            contentHash: nil,
+            contentHash: ContentHasher.hash(data: data),
             clientModified: clientModified,
             serverModified: Date(),
             symlinkTarget: nil,

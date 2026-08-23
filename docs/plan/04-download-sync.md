@@ -146,7 +146,7 @@ type collisions, deletion with exact-casing guard, index + hash-cache updates,
 mtime setting (min(clientModified, serverModified, now) — api-notes; engine §4.6
 step 6).
 
-- [ ] TDD per behavior, minimum set:
+- [x] TDD per behavior, minimum set:
   new remote file lands with right content/mtime/index row;
   identical content on disk → skipped, index updated (rev bumped);
   same rev → skipped, index untouched;
@@ -159,7 +159,7 @@ step 6).
   symlink event creates symlink without download;
   casing-only remote rename → local rename, index cased path updated;
   parent-missing event → parent fetched and created first.
-- [ ] Commit after each green cluster.
+- [x] Commit after each green cluster.
 
 ### Task 4.6: Download cycle & cursors
 
