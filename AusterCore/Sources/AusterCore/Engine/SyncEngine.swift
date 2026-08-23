@@ -1,0 +1,352 @@
+import Foundation
+
+/// The sync algorithms of engine-doc §§3–9.
+///
+/// An actor because only one cycle may mutate the local folder and the index at
+/// a time (design §3); parallelism lives *inside* a cycle, in the bounded task
+/// group that runs file transfers. Nothing here decides *when* to sync — the
+/// coordinator drives longpolling and scheduling, so a cycle is always something
+/// somebody asked for and can cancel.
+public actor SyncEngine {
+
+    /// Concurrent transfers per direction (engine-doc §7).
+    static let transferConcurrency = 6
+
+    private let service: DropboxService
+    private let database: SyncDatabase
+    private let pathStore: PathStore
+    private let hasher: CachedContentHasher
+    private let fileOps: LocalFileOperations
+
+    /// Read fresh on every use: Phase 7 lets the user change the selection while
+    /// a cycle is running, and a captured snapshot would act on a stale one.
+    private let excludedItems: @Sendable () -> Set<String>
+
+    private let events: SyncEngineEvents
+
+    /// The linked account's display name, for conflicted-copy naming. Resolved
+    /// once per cycle rather than per item.
+    private var ownerName: String?
+
+    public init(
+        service: DropboxService,
+        database: SyncDatabase,
+        pathStore: PathStore,
+        hasher: CachedContentHasher,
+        fileOps: LocalFileOperations,
+        excludedItems: @escaping @Sendable () -> Set<String>,
+        events: SyncEngineEvents
+    ) {
+        self.service = service
+        self.database = database
+        self.pathStore = pathStore
+        self.hasher = hasher
+        self.fileOps = fileOps
+        self.excludedItems = excludedItems
+        self.events = events
+    }
+
+    // MARK: - Download cycle (§4.1)
+
+    /// Applies everything the remote has done since the saved cursor.
+    ///
+    /// With no cursor this is the first-run index of the whole Dropbox; with one
+    /// it is a delta. Longpolling is deliberately *not* here: deciding when to
+    /// ask is the coordinator's job, and this stays a single, cancellable unit of
+    /// work.
+    ///
+    /// - Throws: `SyncFatalError` and connection failures, which stop sync.
+    ///   Per-path failures are recorded as sync issues and never surface here.
+    public func downloadCycle() async throws {
+        try fileOps.ensureRootPresent()
+        defer { fileOps.cleanCacheDir() }
+
+        let applier = try await makeApplier()
+
+        do {
+            try await runDownloadPages(with: applier)
+        } catch DropboxServiceError.cursorReset {
+            // The cursor is void; everything has to be re-derived. Nothing local
+            // is discarded — the re-index diffs against the index we still have,
+            // so unchanged files are recognised rather than re-downloaded.
+            try database.setState(.remoteCursor, nil)
+            try database.setState(.didFinishIndexing, "0")
+            try await runDownloadPages(with: applier)
+        }
+    }
+
+    /// Pages through the listing, applying and then persisting each page.
+    ///
+    /// The cursor is written *after* its page is applied, never before: that
+    /// ordering is what makes an interruption resumable instead of lossy
+    /// (decisions D9.4).
+    private func runDownloadPages(with applier: DownloadApplier) async throws {
+        let savedCursor = try database.stateString(.remoteCursor) ?? ""
+        var isIndexing = try database.stateString(.didFinishIndexing) != "1"
+
+        var page: ListPage
+        if savedCursor.isEmpty {
+            isIndexing = true
+            try database.setState(.didFinishIndexing, "0")
+            try database.setState(.indexingCounter, "0")
+            page = try await listRoot()
+        } else {
+            page = try await mapFatal { try await service.listFolderContinue(cursor: savedCursor) }
+        }
+
+        while true {
+            try Task.checkCancellation()
+
+            let applied = try await applyPage(page.entries, with: applier, indexing: isIndexing)
+            try database.setState(.remoteCursor, page.cursor)
+
+            if isIndexing {
+                let total = (Int(try database.stateString(.indexingCounter) ?? "0") ?? 0) + applied
+                try database.setState(.indexingCounter, String(total))
+                events.statusText("Indexing \(total)…")
+            }
+
+            guard page.hasMore else { break }
+            page = try await mapFatal { try await service.listFolderContinue(cursor: page.cursor) }
+        }
+
+        if isIndexing {
+            try database.setState(.didFinishIndexing, "1")
+        }
+    }
+
+    private func listRoot() async throws -> ListPage {
+        try await mapFatal { try await service.listFolder(path: "", recursive: true) }
+    }
+
+    // MARK: - Applying a page (§4.2, §4.3)
+
+    /// Cleans, filters, orders and applies one page.
+    ///
+    /// - Returns: how many events were applied, for the indexing counter.
+    @discardableResult
+    private func applyPage(
+        _ entries: [RemoteMetadata],
+        with applier: DownloadApplier,
+        indexing: Bool
+    ) async throws -> Int {
+        let cleaned = try RemoteChangeCleaner.clean(entries, index: database)
+        let admitted = try admissible(cleaned)
+        guard !admitted.isEmpty else { return 0 }
+
+        if !indexing { events.statusText("Syncing…") }
+
+        var built: [SyncItemEvent] = []
+        built.reserveCapacity(admitted.count)
+        for entry in admitted {
+            built.append(try await SyncItemEvent(remote: entry, index: database, pathStore: pathStore))
+        }
+
+        // Deletions and folders shallowest-first: removing a parent takes its
+        // children with it, and creating one has to precede them.
+        let deletions = built.filter { $0.changeType == .removed }.sorted(by: Self.shallowestFirst)
+        let folders = built.filter { $0.changeType != .removed && $0.itemType == .folder }
+            .sorted(by: Self.shallowestFirst)
+        let files = built.filter { $0.changeType != .removed && $0.itemType != .folder }
+
+        for event in deletions + folders {
+            try Task.checkCancellation()
+            try await applyOne(event, with: applier)
+        }
+        try await applyInParallel(files, with: applier)
+
+        return built.count
+    }
+
+    /// Runs file transfers concurrently, bounded so a large page cannot open a
+    /// connection per file (engine-doc §7).
+    private func applyInParallel(_ events: [SyncItemEvent], with applier: DownloadApplier) async throws {
+        guard !events.isEmpty else { return }
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            var next = 0
+            let inFlight = min(Self.transferConcurrency, events.count)
+
+            for _ in 0..<inFlight {
+                let event = events[next]
+                next += 1
+                group.addTask { try await self.applyOne(event, with: applier) }
+            }
+
+            while try await group.next() != nil {
+                guard next < events.count else { continue }
+                try Task.checkCancellation()
+                let event = events[next]
+                next += 1
+                group.addTask { try await self.applyOne(event, with: applier) }
+            }
+        }
+    }
+
+    /// Applies one event, turning anything that concerns only this path into a
+    /// recorded sync issue (design §5).
+    private func applyOne(_ event: SyncItemEvent, with applier: DownloadApplier) async throws {
+        do {
+            let completion = try await applier.apply(event)
+            try database.clearSyncErrors(pathLower: event.dbxPathLower)
+            try recordHistory(for: event, completion: completion)
+            events.itemCompleted(event, completion)
+        } catch let error as DropboxServiceError {
+            // These are about the session, not the file, and every other path in
+            // the page would fail the same way.
+            switch error {
+            case .notAuthorized: throw SyncFatalError.notAuthorized
+            case .connection, .cursorReset: throw error
+            default: break
+            }
+
+            let itemError = SyncItemError(
+                dbxPath: event.dbxPath,
+                dbxPathLower: event.dbxPathLower,
+                direction: .down,
+                title: Self.failureTitle(for: event),
+                message: error.localizedDescription
+            )
+            try database.upsertSyncError(itemError.entry)
+            events.itemCompleted(event, .failed(itemError))
+        }
+    }
+
+    private static func failureTitle(for event: SyncItemEvent) -> String {
+        switch event.changeType {
+        case .removed: "Could not delete item"
+        default: event.itemType == .folder ? "Could not create folder" : "Could not download file"
+        }
+    }
+
+    private func recordHistory(for event: SyncItemEvent, completion: SyncCompletion) throws {
+        // Only real changes are worth showing: a skip means the user's folder
+        // already looked the way it looks now.
+        guard completion == .done || completion == .conflictedCopy else { return }
+        try database.appendHistory(
+            HistoryEntry(
+                direction: .down,
+                changeType: event.changeType,
+                itemType: event.itemType ?? .file,
+                dbxPath: event.dbxPath,
+                size: event.size,
+                timestamp: event.changeTime ?? Date()
+            )
+        )
+    }
+
+    // MARK: - Filtering (§8)
+
+    /// Drops what Auster never syncs and what the user deselected.
+    ///
+    /// A deletion is the one thing an exclusion does not suppress: once the item
+    /// is gone from Dropbox there is nothing left to exclude, and keeping the
+    /// entry would silently swallow a future folder of the same name.
+    private func admissible(_ entries: [RemoteMetadata]) throws -> [RemoteMetadata] {
+        let excluded = excludedItems()
+        var retracted: Set<String> = []
+
+        let kept = entries.filter { entry in
+            let pathLower = PathStore.normalize(entry.pathLower)
+            if Exclusions.isExcludedName(pathLower) { return false }
+            guard Exclusions.isExcluded(byUser: pathLower, excluded: excluded) else { return true }
+
+            if entry.isDeleted { retracted.insert(pathLower) }
+            return false
+        }
+
+        if !retracted.isEmpty { try retractExclusions(under: retracted) }
+        return kept
+    }
+
+    /// Removes deleted paths, and everything beneath them, from the stored
+    /// selective-sync set.
+    ///
+    /// The database is the source of truth for the selection (implementation
+    /// note N10); the UI's mirror is Phase 7's to keep in step.
+    private func retractExclusions(under retracted: Set<String>) throws {
+        guard let raw = try database.stateString(.excludedItems),
+            let stored = try? JSONDecoder().decode([String].self, from: Data(raw.utf8))
+        else {
+            return
+        }
+
+        let remaining = stored.filter { entry in
+            !retracted.contains { entry == $0 || entry.hasPrefix($0 + "/") }
+        }
+        guard remaining.count != stored.count else { return }
+
+        let encoded = try JSONEncoder().encode(remaining.sorted())
+        try database.setState(.excludedItems, String(decoding: encoded, as: UTF8.self))
+    }
+
+    // MARK: - Single items (§4)
+
+    /// Fetches one remote path and applies it, recursively for a folder.
+    ///
+    /// Used where a cycle is the wrong unit of work: retrying a path that failed
+    /// last time, and Phase 7's "include this folder again", which has to fetch a
+    /// subtree the cursor has long since moved past. The cursor is untouched — this
+    /// is out-of-band, and advancing it would skip changes the next cycle owes us.
+    public func fetchRemoteItem(dbxPathLower: String) async throws {
+        try fileOps.ensureRootPresent()
+        defer { fileOps.cleanCacheDir() }
+
+        let applier = try await makeApplier()
+        let pathLower = PathStore.normalize(dbxPathLower)
+
+        guard let metadata = try await mapFatal({ try await service.metadata(path: pathLower, includeDeleted: true) })
+        else {
+            return
+        }
+
+        var entries = [metadata]
+        if metadata.asFolder != nil {
+            var page = try await mapFatal { try await service.listFolder(path: pathLower, recursive: true) }
+            entries.append(contentsOf: page.entries)
+            while page.hasMore {
+                page = try await mapFatal { try await service.listFolderContinue(cursor: page.cursor) }
+                entries.append(contentsOf: page.entries)
+            }
+        }
+
+        try await applyPage(entries, with: applier, indexing: false)
+    }
+
+    // MARK: - Internals
+
+    private func makeApplier() async throws -> DownloadApplier {
+        if ownerName == nil {
+            ownerName = try? await service.currentAccount().displayName
+        }
+        return DownloadApplier(
+            service: service,
+            database: database,
+            pathStore: pathStore,
+            hasher: hasher,
+            fileOps: fileOps,
+            events: events,
+            ownerName: ownerName
+        )
+    }
+
+    /// Turns the errors that end a session into `SyncFatalError`, leaving the
+    /// rest for the per-path handler.
+    private func mapFatal<T>(_ body: () async throws -> T) async throws -> T {
+        do {
+            return try await body()
+        } catch DropboxServiceError.notAuthorized {
+            throw SyncFatalError.notAuthorized
+        }
+    }
+
+    private static func shallowestFirst(_ lhs: SyncItemEvent, _ rhs: SyncItemEvent) -> Bool {
+        depth(of: lhs.dbxPathLower) < depth(of: rhs.dbxPathLower)
+    }
+
+    private static func depth(of pathLower: String) -> Int {
+        pathLower.reduce(into: 0) { count, character in
+            if character == "/" { count += 1 }
+        }
+    }
+}

@@ -39,11 +39,11 @@ Constructors: `SyncItemEvent(remote: RemoteMetadata, index:, pathStore:)`
 (direction .down; changeType added/modified by index presence, removed for
 deleted; per engine-doc §1.4 notes) — async because of `correctCase`.
 
-- [ ] `RemoteChangeCleaner.clean(_ entries: [RemoteMetadata], index:) -> [RemoteMetadata]`
+- [x] `RemoteChangeCleaner.clean(_ entries: [RemoteMetadata], index:) -> [RemoteMetadata]`
   per §4.2. TDD: multiple entries per path keep last; type change (index folder,
   last entry file) synthesizes deleted-before-file; single entries untouched;
   order by depth afterwards is caller's job.
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 4.2: SyncEngine skeleton + download conflict table
 
@@ -84,7 +84,7 @@ implements the §4.4 table **in its exact order** (rev equality → hash equalit
 unresolved upload error → recursive-ctime unsynced check (§4.5) → deletion rule →
 conflict).
 
-- [ ] TDD one test per table row, plus: folder rev `"folder"` equality; symlink
+- [x] TDD one test per table row, plus: folder rev `"folder"` equality; symlink
   target considered in hash equality; excluded names never count as unsynced
   changes in the recursive ctime walk; missing-locally + in-index counts as
   changed. Use temp dirs + seeded DB. Commit.
@@ -113,7 +113,7 @@ public struct LocalFileOperations: Sendable {          // all mutations route th
 public struct ExpectedFSEvent: Sendable, Equatable { public enum Kind { case created, deleted, modified, moved(to: URL) }; public let kind: Kind; public let url: URL; public let isDirectory: Bool; public let recursive: Bool }
 ```
 
-- [ ] TDD: atomic move replaces existing file and preserves its POSIX permissions
+- [x] TDD: atomic move replaces existing file and preserves its POSIX permissions
   when asked; exact-casing delete refuses `A.txt` when disk has `a.txt`;
   `ensureRootPresent` throws when root missing or casing drifted; cache dir
   auto-created and named `.auster.cache` (also add it to the excluded-names set —
@@ -128,7 +128,7 @@ static func isExcludedName(_ pathOrName: String) -> Bool  // engine-doc §8 list
 static func isExcluded(byUser dbxPathLower: String, excluded: Set<String>) -> Bool  // path == or child of any excluded entry
 }`
 
-- [ ] TDD: every name in the §8 list; `~$doc.docx`, `.~lock`, `~x.tmp` patterns;
+- [x] TDD: every name in the §8 list; `~$doc.docx`, `.~lock`, `~x.tmp` patterns;
   `Icon\r`; user exclusion child/exact matching (`"/a"` excludes `/a/b`, not
   `/ab`). Commit.
 
@@ -146,7 +146,7 @@ type collisions, deletion with exact-casing guard, index + hash-cache updates,
 mtime setting (min(clientModified, serverModified, now) — api-notes; engine §4.6
 step 6).
 
-- [ ] TDD per behavior, minimum set:
+- [x] TDD per behavior, minimum set:
   new remote file lands with right content/mtime/index row;
   identical content on disk → skipped, index updated (rev bumped);
   same rev → skipped, index untouched;
@@ -159,7 +159,7 @@ step 6).
   symlink event creates symlink without download;
   casing-only remote rename → local rename, index cased path updated;
   parent-missing event → parent fetched and created first.
-- [ ] Commit after each green cluster.
+- [x] Commit after each green cluster.
 
 ### Task 4.6: Download cycle & cursors
 
@@ -174,10 +174,12 @@ persist cursor → next page. `.cursorReset` → clear cursor + full reindex.
 Excluded (by name or by user) events dropped; remote deletion of an excluded item
 removes it from the excluded set (§8).
 
-- [ ] TDD with MockDropboxService: initial index of nested tree (assert local
+- [x] TDD with MockDropboxService: initial index of nested tree (assert local
   tree + index count + cursor saved); interruption mid-pagination (cancel after
   page 1) resumes without re-downloading page-1 files (mock counts downloads);
   steady-state delta applies only changes; ordering (parent folders exist before
   children — seed mock to emit children first); cursor reset path; excluded
   subtree never touches disk.
 - [ ] Manual verification with the real account (see phase header). Commit.
+      *Blocked: needs Josh's linked Dropbox account (see "When to ask Josh").
+      Everything else in this phase is green under the scenario tests.*

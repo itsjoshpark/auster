@@ -93,6 +93,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     private var storedUsage = SpaceUsage(used: 0, allocated: 2_000_000_000)
     private var storedPageSize: Int?
     private var storedLongpollBackoff: Int?
+    private var storedReversesListingOrder = false
 
     public init() {}
 
@@ -122,6 +123,17 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     public var longpollBackoff: Int? {
         get { lock.withLock { storedLongpollBackoff } }
         set { lock.withLock { storedLongpollBackoff = newValue } }
+    }
+
+    /// Emits every page's entries back to front.
+    ///
+    /// Dropbox promises only that applying a page *in order* reproduces server
+    /// state — not that parents precede their children. Setting this proves the
+    /// engine's own ordering (engine-doc §4.3) is what puts folders first,
+    /// rather than the listing happening to arrive that way.
+    public var reversesListingOrder: Bool {
+        get { lock.withLock { storedReversesListingOrder } }
+        set { lock.withLock { storedReversesListingOrder = newValue } }
     }
 
     /// Routes called so far, in order — for asserting that a code path did (or
@@ -161,15 +173,47 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
 
     /// Puts a file into the remote without going through the upload path.
     @discardableResult
-    public func seedFile(at path: String, contents: String) throws -> RemoteFile {
-        try seedFile(at: path, data: Data(contents.utf8))
+    public func seedFile(at path: String, contents: String, clientModified: Date = Date()) throws -> RemoteFile {
+        try seedFile(at: path, data: Data(contents.utf8), clientModified: clientModified)
     }
 
     /// Puts a file into the remote without going through the upload path.
     @discardableResult
-    public func seedFile(at path: String, data: Data) throws -> RemoteFile {
+    public func seedFile(at path: String, data: Data, clientModified: Date = Date()) throws -> RemoteFile {
         try lock.withLock {
-            try write(data: data, to: path, mode: .overwrite, autorename: false, clientModified: Date())
+            try write(data: data, to: path, mode: .overwrite, autorename: false, clientModified: clientModified)
+        }
+    }
+
+    /// Puts a symlink into the remote.
+    ///
+    /// Dropbox stores a symlink as file metadata carrying `symlink_info`, with
+    /// no content worth downloading — which is what lets the engine reproduce it
+    /// without a transfer (engine-doc §4.6 step 4).
+    @discardableResult
+    public func seedSymlink(at path: String, target: String) -> RemoteFile {
+        lock.withLock {
+            createParents(of: path)
+            let display = Self.normalized(path)
+            let file = RemoteFile(
+                id: nodes[display.lowercased()]?.metadata.asFile?.id ?? nextID(),
+                name: Self.basename(of: display),
+                pathLower: display.lowercased(),
+                pathDisplay: display,
+                rev: nextRev(),
+                size: 0,
+                contentHash: ContentHasher.hash(data: Data()),
+                clientModified: Date(),
+                serverModified: Date(),
+                symlinkTarget: target,
+                isDownloadable: true,
+                modifiedBy: nil
+            )
+            nodes[file.pathLower] = Node(metadata: .file(file), data: Data())
+            revisions[file.rev] = (file, Data())
+            tombstones[file.pathLower] = nil
+            changeLog.append(.file(file))
+            return file
         }
     }
 
@@ -248,10 +292,11 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
                 return page(from: remaining, logPosition: logPosition, root: root, recursive: recursive)
 
             case .delta(let logPosition, let root, let recursive):
-                let delta = changeLog[logPosition...]
+                var delta = changeLog[logPosition...]
                     .filter { Self.isDescendant($0.pathLower, of: root, recursive: recursive) }
+                if storedReversesListingOrder { delta.reverse() }
                 return ListPage(
-                    entries: Array(delta),
+                    entries: delta,
                     cursor: makeCursor(.delta(logPosition: changeLog.count, root: root, recursive: recursive)),
                     hasMore: false
                 )
@@ -375,7 +420,9 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
             guard let source = nodes[sourceKey] else { throw DropboxServiceError.notFound(path: from) }
 
             var destination = to
-            if nodes[Self.key(for: to)] != nil {
+            // A move that only changes casing lands on its own key, and Dropbox
+            // allows it — it is how a rename to `Report.TXT` is expressed.
+            if nodes[Self.key(for: to)] != nil, Self.key(for: to) != sourceKey {
                 guard autorename else { throw DropboxServiceError.conflict(path: to) }
                 destination = availablePath(basedOn: to)
             }
@@ -396,13 +443,17 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
                 if let file = relocated.asFile { revisions[file.rev] = (file, node.data) }
             }
 
-            let tombstone = RemoteDeleted(
-                name: source.metadata.name,
-                pathLower: source.metadata.pathLower,
-                pathDisplay: source.metadata.pathDisplay
-            )
-            tombstones[sourceKey] = tombstone
-            changeLog.append(.deleted(tombstone))
+            // A case-only rename has nothing to bury: the entry is still there,
+            // just spelled differently.
+            if moved.pathLower != sourceKey {
+                let tombstone = RemoteDeleted(
+                    name: source.metadata.name,
+                    pathLower: source.metadata.pathLower,
+                    pathDisplay: source.metadata.pathDisplay
+                )
+                tombstones[sourceKey] = tombstone
+                changeLog.append(.deleted(tombstone))
+            }
             changeLog.append(moved)
             return moved
         }
@@ -485,7 +536,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
             pathDisplay: Self.normalized(target),
             rev: nextRev(),
             size: Int64(data.count),
-            contentHash: nil,
+            contentHash: ContentHasher.hash(data: data),
             clientModified: clientModified,
             serverModified: Date(),
             symlinkTarget: nil,
@@ -597,6 +648,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
         root: String,
         recursive: Bool
     ) -> ListPage {
+        let entries = storedReversesListingOrder ? entries.reversed() : entries
         guard let limit = storedPageSize, entries.count > limit else {
             return ListPage(
                 entries: entries,

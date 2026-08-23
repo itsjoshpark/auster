@@ -183,3 +183,47 @@ types in `Database/Records.swift` store `Double` columns and convert at the
 boundary. This is also why the public model types stay free of GRDB: the
 internal record structs own the column names and the on-disk representation.
 
+
+### N12. Phase 4's tasks were committed in dependency order (Phase 4)
+The phase file orders the tasks 4.1 → 4.6, but 4.2's `ConflictResolver` tests
+need both `Exclusions` (4.4, for the names that never count as unsynced
+changes) and `SyncFatalError` (4.3). The commits therefore run
+4.1 → 4.4 → 4.3 → 4.2 → 4.5 → 4.6. `Engine/SyncEngine.swift` is created in 4.6
+rather than 4.2 for the same reason: nothing exercises it until the download
+cycle exists, and an untested stub would have been dead code.
+`SyncEngineEvents`/`SyncCompletion` live in their own
+`Engine/SyncEngineEvents.swift` because `DownloadApplier` needs them a task
+earlier than the engine does. No interface from the phase file changed.
+
+### N13. `MockDropboxService` gained content hashes, symlinks, and case renames (Phase 4)
+Three behavioural gaps that made real engine rules untestable, all fixed in the
+direction of what Dropbox actually does:
+
+- Files now carry a computed `content_hash`. It was `nil`, which made §4.4's
+  "identical content already on disk" rule unreachable — the rule that stops a
+  first index re-downloading a folder the user already has.
+- `seedSymlink(at:target:)` exists, since a symlink is file metadata carrying
+  `symlink_info` and there was no way to produce one.
+- `move` accepts a rename that only changes case. It previously rejected one as
+  a collision, because source and destination share a lookup key.
+
+Also `seedFile` takes a `clientModified:`, and `reversesListingOrder` emits each
+page back to front — Dropbox promises only that a page applied *in order*
+reproduces server state, not that parents precede children, so the engine's own
+depth ordering (§4.3) is what has to guarantee it.
+
+### N14. Always-excluded names are matched case-insensitively (Phase 4)
+Engine-doc §8 gives the list as "case-sensitive where meaningful" and spells two
+entries twice (`Thumbs.db`/`thumbs.db`, `.DS_Store`/`.ds_store`). Auster matches
+the whole list case-insensitively instead: Dropbox paths are case-insensitive,
+so `Desktop.ini` and `desktop.ini` are one file, and a rule catching only one
+spelling would sync the other. Matching also applies to *every* component of a
+path, not just the basename, so nothing inside `.dropbox.cache` or
+`.auster.cache` is ever queued.
+
+### N15. Selective-sync retraction writes the database, not the config mirror (Phase 4)
+§8 says a remote deletion of an excluded item removes it from the exclusion
+list. The engine writes `StateKey.excludedItems` directly, consistent with N10
+(the database is the source of truth, `AppConfig` mirrors it). The engine's
+`excludedItems` closure stays read-only; Phase 7 owns keeping the UI's mirror in
+step.
