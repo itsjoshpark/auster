@@ -39,7 +39,7 @@ Constructors: `SyncItemEvent(remote: RemoteMetadata, index:, pathStore:)`
 (direction .down; changeType added/modified by index presence, removed for
 deleted; per engine-doc §1.4 notes) — async because of `correctCase`.
 
-- [ ] `RemoteChangeCleaner.clean(_ entries: [RemoteMetadata], index:) -> [RemoteMetadata]`
+- [x] `RemoteChangeCleaner.clean(_ entries: [RemoteMetadata], index:) -> [RemoteMetadata]`
   per §4.2. TDD: multiple entries per path keep last; type change (index folder,
   last entry file) synthesizes deleted-before-file; single entries untouched;
   order by depth afterwards is caller's job.
