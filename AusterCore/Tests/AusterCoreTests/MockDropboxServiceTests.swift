@@ -321,7 +321,8 @@ struct MockDropboxServiceTests {
 
         let delta = try await mock.listFolderContinue(cursor: cursor)
         #expect(delta.entries.count == 1)
-        #expect(delta.entries[0] == .deleted(RemoteDeleted(name: "Photos", pathLower: "/photos", pathDisplay: "/Photos")))
+        let tombstone = RemoteDeleted(name: "Photos", pathLower: "/photos", pathDisplay: "/Photos")
+        #expect(delta.entries[0] == .deleted(tombstone))
         #expect(try await mock.metadata(path: "/Photos/cat.jpg", includeDeleted: false) == nil)
     }
 

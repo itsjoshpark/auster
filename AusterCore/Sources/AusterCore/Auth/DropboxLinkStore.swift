@@ -58,10 +58,9 @@ public final class KeychainDropboxLinkStore: DropboxLinkStore {
     private let application: any SharedApplication
     private let serviceFactory: @MainActor (DropboxClient) -> any DropboxService
 
-    /// - Parameters:
-    ///   - appKey: the Dropbox app key. Also fixes the `db-<key>` redirect scheme.
-    ///   - presenter: opens URLs and shows errors; implemented by the app target,
-    ///     because that is the only layer allowed to touch AppKit.
+    /// `appKey` also fixes the `db-<key>` redirect scheme. `presenter` opens URLs
+    /// and shows errors; the app target implements it, because that is the only
+    /// layer allowed to touch AppKit.
     public init(
         appKey: String,
         presenter: any AuthorizationPresenter,

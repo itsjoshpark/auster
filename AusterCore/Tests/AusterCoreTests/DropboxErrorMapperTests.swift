@@ -90,8 +90,10 @@ struct DropboxErrorMapperTests {
 
     @Test("a 5xx status is a connection problem, a 4xx status is not")
     func httpStatusSplit() {
-        #expect(DropboxErrorMapper.map(CallError<Files.DownloadError>.httpError(502, nil, nil), path: path) == .connection)
-        #expect(DropboxErrorMapper.map(CallError<Files.DownloadError>.httpError(400, "bad", nil), path: path).isRetryable == false)
+        let serverSide = CallError<Files.DownloadError>.httpError(502, nil, nil)
+        let clientSide = CallError<Files.DownloadError>.httpError(400, "bad", nil)
+        #expect(DropboxErrorMapper.map(serverSide, path: path) == .connection)
+        #expect(!DropboxErrorMapper.map(clientSide, path: path).isRetryable)
     }
 
     @Test("a URL session failure means offline, not a permanent error")

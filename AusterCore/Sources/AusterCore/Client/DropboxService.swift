@@ -28,9 +28,9 @@ public protocol DropboxService: Sendable {
 
     /// Blocks until something changes after `cursor` or `timeout` seconds pass.
     ///
-    /// - Parameter timeout: 30–480 seconds. The server adds up to 90 s of jitter.
-    /// - Returns: whether there are changes, and a server-requested backoff to
-    ///   sleep through before longpolling again.
+    /// `timeout` must be 30–480 seconds; the server adds up to 90 s of jitter on
+    /// top. The reply says whether there are changes, and carries a
+    /// server-requested backoff to sleep through before longpolling again.
     func longpoll(cursor: String, timeout: Int) async throws -> (changes: Bool, backoff: Int?)
 
     // MARK: Single items
@@ -49,7 +49,7 @@ public protocol DropboxService: Sendable {
     /// atomically (decisions D9.3). On an unrecoverable hash mismatch the partial
     /// file is deleted and `.dataCorrupted` is thrown.
     ///
-    /// - Parameter progress: cumulative bytes written so far.
+    /// `progress` receives the cumulative bytes written so far.
     func download(
         rev: String,
         to localURL: URL,
@@ -62,7 +62,7 @@ public protocol DropboxService: Sendable {
     /// If the file changes while it is being read, the upload is abandoned with
     /// `.fileChangedDuringUpload` rather than committing a torn snapshot.
     ///
-    /// - Parameter progress: cumulative bytes sent so far.
+    /// `progress` receives the cumulative bytes sent so far.
     func upload(
         from localURL: URL,
         to dbxPath: String,

@@ -67,9 +67,8 @@ public struct SystemSleeper: RetrySleeper {
 /// layer — propagates on the first attempt, because retrying a `notFound` or a
 /// `notAuthorized` just delays the real answer.
 ///
-/// - Parameters:
-///   - randomFraction: source of jitter in `0...1`; injectable so delays are
-///     deterministic under test.
+/// `randomFraction` is the source of jitter, in `0...1`. It is injectable so
+/// delays are deterministic under test.
 public func withRetry<T>(
     policy: RetryPolicy = .standard,
     sleeper: any RetrySleeper = SystemSleeper(),

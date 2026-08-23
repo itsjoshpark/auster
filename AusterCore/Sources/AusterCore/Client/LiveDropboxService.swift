@@ -25,8 +25,8 @@ public final class LiveDropboxService: DropboxService, @unchecked Sendable {
     /// content-hash block size, so a chunk is exactly one hash block.
     static let singleCallUploadLimit = ContentHasher.blockSize
 
-    /// - Parameter client: an authorized client. `AuthManager` owns the linking;
-    ///   this type only makes calls.
+    /// `client` must already be authorized: `AuthManager` owns the linking, and
+    /// this type only makes calls.
     public init(
         client: DropboxClient,
         policy: RetryPolicy = .standard,
