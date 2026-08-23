@@ -84,7 +84,7 @@ implements the §4.4 table **in its exact order** (rev equality → hash equalit
 unresolved upload error → recursive-ctime unsynced check (§4.5) → deletion rule →
 conflict).
 
-- [ ] TDD one test per table row, plus: folder rev `"folder"` equality; symlink
+- [x] TDD one test per table row, plus: folder rev `"folder"` equality; symlink
   target considered in hash equality; excluded names never count as unsynced
   changes in the recursive ctime walk; missing-locally + in-index counts as
   changed. Use temp dirs + seeded DB. Commit.
