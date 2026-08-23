@@ -125,8 +125,18 @@ public struct LocalFileOperations: Sendable {
             try? FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: source.path)
         }
 
+        // Three declarations for one operation, because `rename(2)` is reported
+        // differently depending on what was there: as a rename of the staged
+        // file onto the destination, or as a creation or modification of the
+        // destination itself. All three are this operation's echo.
         try ignore.ignoring(
             [
+                ExpectedFSEvent(
+                    kind: .moved(to: destination),
+                    url: source,
+                    isDirectory: false,
+                    recursive: false
+                ),
                 expected(.created, destination, isDirectory: false),
                 expected(.modified, destination, isDirectory: false),
             ]
@@ -203,12 +213,16 @@ public struct LocalFileOperations: Sendable {
             withIntermediateDirectories: true
         )
 
-        try ignore.ignoring(
-            [expected(.deleted, url, isDirectory: false), expected(.created, url, isDirectory: false)]
-        ) {
-            if (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil {
+        // Two declarations in two calls, because these really are two events:
+        // one `ignoring` call declares alternative descriptions of one event.
+        // The deletion is only declared when there is something to delete, so no
+        // expectation is left waiting for an event that never comes.
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil {
+            try ignore.ignoring([expected(.deleted, url, isDirectory: false)]) {
                 try FileManager.default.removeItem(at: url)
             }
+        }
+        try ignore.ignoring([expected(.created, url, isDirectory: false)]) {
             try FileManager.default.createSymbolicLink(atPath: url.path, withDestinationPath: target)
         }
     }
@@ -232,7 +246,14 @@ public struct LocalFileOperations: Sendable {
     ///
     /// - Throws: `SyncFatalError.dropboxFolderMissing`.
     public func ensureRootPresent() throws {
-        guard itemIsDirectory(at: root) == true, nameMatchesExactly(root) else {
+        try Self.ensurePresent(root: root)
+    }
+
+    /// The same guard, without needing an instance — the catch-up scan runs it
+    /// before it is allowed to emit a single deletion (engine-doc §6).
+    public static func ensurePresent(root: URL) throws {
+        let url = root.standardizedFileURL
+        guard isDirectory(at: url) == true, nameMatchesExactly(url) else {
             throw SyncFatalError.dropboxFolderMissing
         }
     }
@@ -242,6 +263,10 @@ public struct LocalFileOperations: Sendable {
     /// Whether the item at `url` is a directory, or `nil` when nothing is there.
     /// Symlinks are not followed — a link to a folder is still a link.
     private func itemIsDirectory(at url: URL) -> Bool? {
+        Self.isDirectory(at: url)
+    }
+
+    private static func isDirectory(at url: URL) -> Bool? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
             return nil
         }
@@ -255,6 +280,10 @@ public struct LocalFileOperations: Sendable {
     /// case-insensitive volume answers about a *different* file than the one
     /// being named.
     private func nameMatchesExactly(_ url: URL) -> Bool {
+        Self.nameMatchesExactly(url)
+    }
+
+    private static func nameMatchesExactly(_ url: URL) -> Bool {
         let name = url.lastPathComponent
         guard
             let siblings = try? FileManager.default.contentsOfDirectory(

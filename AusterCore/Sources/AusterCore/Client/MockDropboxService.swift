@@ -80,6 +80,10 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
 
     private var pendingFailures: [Call: [DropboxServiceError]] = [:]
     private var recorded: [Call] = []
+    private var uploads: [(path: String, mode: WriteMode, clientModified: Date)] = []
+    private var deletes: [(path: String, parentRev: String?)] = []
+    private var moves: [(from: String, to: String)] = []
+    private var folderCreations: [String] = []
     private var isAuthorized = true
 
     private var storedAccount = AccountInfo(
@@ -140,6 +144,30 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     /// did not) reach the network.
     public var recordedCalls: [Call] {
         lock.withLock { recorded }
+    }
+
+    /// Every upload, with the arguments the engine chose.
+    ///
+    /// The write mode is the whole safety story of an upload (api-notes §2), so
+    /// asserting on it is asserting that a lost update is impossible.
+    public var recordedUploads: [(path: String, mode: WriteMode, clientModified: Date)] {
+        lock.withLock { uploads }
+    }
+
+    /// Every delete, with the revision guard the engine attached (decisions D9.5).
+    public var recordedDeletes: [(path: String, parentRev: String?)] {
+        lock.withLock { deletes }
+    }
+
+    /// Every move, source then destination.
+    public var recordedMoves: [(from: String, to: String)] {
+        lock.withLock { moves }
+    }
+
+    /// Every folder creation, in order — enough to assert that parents were
+    /// created before their children (engine-doc §5.5).
+    public var recordedFolderCreations: [String] {
+        lock.withLock { folderCreations }
     }
 
     /// Makes the next `times` calls to `call` throw `error`.
@@ -377,6 +405,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
 
         let uploaded: RemoteFile = try lock.withLock {
             try enter(.upload)
+            uploads.append((Self.normalized(dbxPath), mode, clientModified))
             return try write(
                 data: data,
                 to: dbxPath,
@@ -394,6 +423,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     public func delete(path: String, parentRev: String?) async throws {
         try lock.withLock {
             try enter(.delete)
+            deletes.append((Self.normalized(path), parentRev))
             let key = Self.key(for: path)
             guard let node = nodes[key] else { throw DropboxServiceError.notFound(path: path) }
 
@@ -416,6 +446,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     public func move(from: String, to: String, autorename: Bool) async throws -> RemoteMetadata {
         try lock.withLock {
             try enter(.move)
+            moves.append((Self.normalized(from), Self.normalized(to)))
             let sourceKey = Self.key(for: from)
             guard let source = nodes[sourceKey] else { throw DropboxServiceError.notFound(path: from) }
 
@@ -462,6 +493,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     public func createFolder(path: String, autorename: Bool) async throws -> RemoteFolder {
         try lock.withLock {
             try enter(.createFolder)
+            folderCreations.append(Self.normalized(path))
             var target = path
             if nodes[Self.key(for: path)] != nil {
                 guard autorename else { throw DropboxServiceError.conflict(path: path) }

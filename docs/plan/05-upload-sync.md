@@ -45,14 +45,14 @@ flag → surface as a special event the coordinator turns into the folder-missin
 check. Always verify against current disk state when flags are ambiguous —
 correctness comes from the cleaning stage + rescans, not perfect flag decoding.
 
-- [ ] TDD IgnoreFilter pure logic: one-shot match consumed; recursive dir ignore
+- [x] TDD IgnoreFilter pure logic: one-shot match consumed; recursive dir ignore
   drops child events (moved: both src+dst must be children); non-matching passes;
   TTL expiry (inject clock).
-- [ ] LocalFileMonitor integration-style test in a temp dir: create/modify/delete
+- [x] LocalFileMonitor integration-style test in a temp dir: create/modify/delete
   → events arrive; op inside `ignoring` → no event; rename → single `.moved`
   (allow fallback pair created+deleted — assert via cleaned output of Task 5.2 to
   avoid flag-decoding flakiness).
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 5.2: Event cleaning
 
@@ -64,7 +64,7 @@ correctness comes from the cleaning stage + rescans, not perfect flag decoding.
 recombine moves unless a side is excluded → prune children of moved/deleted
 dirs; use dictionaries/sets, target ≥20k events < 1 s).
 
-- [ ] TDD each §5.3 rule: created+deleted (temporary) → dropped + rescan
+- [x] TDD each §5.3 rule: created+deleted (temporary) → dropped + rescan
   requested; deleted+created → modified; type change → delete+create pair;
   n(created)>n(deleted) → single created; move with side-events → stays split;
   move to excluded path → split into delete (src) + nothing (dst excluded
@@ -88,7 +88,7 @@ rename skip, post-move recursive index refresh), deletion guards (type-mismatch
 skips + untrack, parentRev-guarded delete, excluded-path skip, never delete when
 remote changed since lastSync).
 
-- [ ] TDD minimum set (MockDropboxService + temp dir):
+- [x] TDD minimum set (MockDropboxService + temp dir):
   new file uploads with `.add` + correct clientModified;
   modified file uploads with `.update(rev)`;
   content identical to remote → skipped, index refreshed;
@@ -101,7 +101,7 @@ remote changed since lastSync).
   local delete happy path with parentRev;
   file at user-excluded path created → renamed "(selective sync conflict)";
   two local names differing only by case → second renamed "(case conflict)".
-- [ ] Commit per green cluster.
+- [x] Commit per green cluster.
 
 ### Task 5.4: Upload cycle + catch-up scan
 
@@ -117,10 +117,10 @@ localCursorTimestamp.
 — engine-doc §6 (mtime vs max(lastSync, localCursor); exact-casing existence for
 deletions; root-presence guard **before** emitting deletions).
 
-- [ ] TDD catch-up: untracked file → created; tracked newer-mtime → modified;
+- [x] TDD catch-up: untracked file → created; tracked newer-mtime → modified;
   tracked missing → deleted; casing-drift counts as missing; root missing →
   throws fatal (no deletion storm); type change → pair.
-- [ ] TDD cycle ordering with a recording mock (deletes before creates; parents
+- [x] TDD cycle ordering with a recording mock (deletes before creates; parents
   before children). Commit.
 
 ### Task 5.5: Two-way scenario suite (engine acceptance tests)
@@ -132,7 +132,7 @@ SyncEngine; helpers `remoteWrite/localWrite/runDownloadCycle/runUploadCycle/
 runCatchUp`, and assertion `assertConverged()` (local tree == remote tree ==
 index; every file's hash consistent).
 
-- [ ] Scenarios (each a test): remote-only changes converge; local-only changes
+- [x] Scenarios (each a test): remote-only changes converge; local-only changes
   converge; **echo test** — downloadCycle's FS mutations produce zero upload
   events through the real IgnoreFilter + monitor wiring; both-sides-different
   edit → exactly one conflicted copy, both contents preserved; local edit +

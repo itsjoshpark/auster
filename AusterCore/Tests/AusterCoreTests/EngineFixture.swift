@@ -117,6 +117,27 @@ final class EngineFixture {
         return try await SyncItemEvent(remote: metadata, index: database, pathStore: pathStore)
     }
 
+    /// The upload event the engine would build for a local change.
+    func uploadEvent(_ raw: RawFSEvent) throws -> SyncItemEvent {
+        try SyncItemEvent(local: raw, index: database, pathStore: pathStore, hasher: hasher)
+    }
+
+    func makeUploadApplier(
+        excludedItems: @escaping @Sendable () -> Set<String> = { [] },
+        events: SyncEngineEvents = SyncEngineEvents()
+    ) -> UploadApplier {
+        UploadApplier(
+            service: service,
+            database: database,
+            pathStore: pathStore,
+            hasher: hasher,
+            fileOps: fileOps,
+            events: events,
+            excludedItems: excludedItems,
+            stabilityPollInterval: .zero
+        )
+    }
+
     func makeEngine(
         excludedItems: @escaping @Sendable () -> Set<String> = { [] },
         events: SyncEngineEvents = SyncEngineEvents()

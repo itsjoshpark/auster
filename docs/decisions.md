@@ -227,3 +227,54 @@ list. The engine writes `StateKey.excludedItems` directly, consistent with N10
 (the database is the source of truth, `AppConfig` mirrors it). The engine's
 `excludedItems` closure stays read-only; Phase 7 owns keeping the UI's mirror in
 step.
+
+### N16. URLs are built lexically, never by statting the path (Phase 5)
+`URL.appendingPathComponent(_:)` and `FileManager.contentsOfDirectory(at:)`
+consult the filesystem: the first appends a trailing slash for an existing
+directory, the second resolves every symlink (`/private/var/…` where the engine
+says `/var/…`). Both make the URL for an item depend on whether it exists yet,
+so the URL `PathStore` derives and the URL the watcher reports for the same file
+compare unequal — and the FS-event ignore filter, the catch-up scan and the
+index all compare exactly those. Three consequences:
+
+- `PathStore.toLocalURL`, `LocalFileMonitor` and `DirectoryListing` (new) all
+  join with `isDirectory: false` and never resolve symlinks.
+- `LocalFileMonitor` keeps two spellings of its root: the configured one it
+  reports in, and a `realpath(3)` one to match FSEvents. `resolvingSymlinksInPath()`
+  cannot be used — it strips the `/private` prefix FSEvents always includes.
+- `IgnoreFilter` compares path components rather than `URL` values.
+
+### N17. One `ignoring` call declares alternative descriptions of one event (Phase 5)
+Engine-doc §5.2 says the filter drops the first matching event per registration.
+That is not enough on its own: `atomicMoveIntoPlace` cannot know in advance
+whether `rename(2)` will surface as a rename of the staged file, a creation of
+the destination, or a modification of it, so it declares all three — and the two
+that do not arrive would sit for the full 2 s TTL, swallowing the user's next
+edit to that file. Matching any declaration therefore retires the others from
+the same call. An operation that genuinely causes two events (`createSymlink`
+replacing an existing link) makes two calls.
+
+### N18. `LocalFileMonitor` filters excluded names itself (Phase 5)
+The staging directory lives *inside* the watched folder, so every download
+writes, stamps and renames a file in there. Filtering `Exclusions.isExcludedName`
+at the watcher rather than in the upload cycle keeps that traffic — and
+`.DS_Store` churn — out of the queue entirely. A move is judged by its
+destination, so a file arriving out of excluded space is still reported.
+
+### N19. Upload-session chunking cannot be asserted at the `DropboxService` seam (Phase 5)
+Phase 5 Task 5.5 asks the 12 MiB scenario to "assert session path with 4 MiB
+chunks". `DropboxService.upload` deliberately hides whether a transfer used one
+call or a session — that choice lives in `LiveDropboxService` (built in Phase 2),
+and `MockDropboxService` has no seam for it. The scenario therefore asserts what
+this layer can be held to: a 12 MiB file round-trips with its content hash
+intact. The chunking itself belongs to the Phase 9 integration tests, against
+the real API.
+
+### N20. `MockDropboxService` records the arguments the engine chose (Phase 5)
+`recordedUploads` (path, write mode, `client_modified`), `recordedDeletes`
+(path, `parentRev`), `recordedMoves` and `recordedFolderCreations`. The write
+mode and the revision guard *are* the safety argument for the upload direction
+(D9.1, D9.5), and ordering — deletions before creations, parents before children
+— is the correctness argument for a batch (§5.5); neither is observable from the
+resulting remote state alone. `reversesListingOrder` exists for the same reason
+on the download side.

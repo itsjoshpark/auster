@@ -156,7 +156,7 @@ public enum ConflictResolver {
     ) -> Bool {
         var seenPathsLower: Set<String> = []
 
-        for child in childURLs(of: localURL) {
+        for child in DirectoryListing.children(of: localURL).map(\.url) {
             let name = child.lastPathComponent
             guard !Exclusions.isExcludedName(name) else { continue }
 
@@ -202,14 +202,6 @@ public enum ConflictResolver {
                     + Double(info.st_ctimespec.tv_nsec) / 1_000_000_000
             )
         )
-    }
-
-    private static func childURLs(of url: URL) -> [URL] {
-        (try? FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: nil,
-            options: []
-        )) ?? []
     }
 
     private static func symlinkTarget(at url: URL) -> String? {
