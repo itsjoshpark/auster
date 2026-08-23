@@ -42,3 +42,13 @@ The app key (Phase 2), anything needing his Dropbox account interactively,
 signing/appcast credentials (Phase 10), and scope changes. Everything else:
 proceed autonomously, and record any genuinely new decision in
 `docs/decisions.md` under "Implementation notes".
+
+## Xcode MCP
+
+Xcode 26.3+ has a built-in MCP server (`xcrun mcpbridge`). If registered in
+this session, its tools can drive Xcode directly (builds, tests, issues,
+running the app) — but only while Josh has `Auster.xcodeproj` open in a
+running Xcode. Prefer the CLI loop (`Scripts/test.sh`, `xcodebuild`) as the
+default; use Xcode MCP when live build issues or running the app would help,
+and ask Josh to open the project if it isn't. It cannot exist before Phase 1
+creates the project.
