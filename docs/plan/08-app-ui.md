@@ -60,7 +60,7 @@ tests `Tests/.../OnboardingModelTests.swift`.
 `SelectiveSyncTab.swift`, `AccountTab.swift`, `AboutTab.swift`),
 `Auster/Support/LoginItem.swift`, `Auster/Support/FolderMover.swift`.
 
-- [ ] Tabs per ux §4: **General** — folder location picker (move via
+- [x] Tabs per ux §4: **General** — folder location picker (move via
   `FolderMover`: stop sync → `FileManager.moveItem` → update config → start;
   alert on failure/occupied target), Start at login (`SMAppService.mainApp`
   toggle), Notify about remote changes, update-check interval

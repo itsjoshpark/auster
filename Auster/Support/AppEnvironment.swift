@@ -81,9 +81,41 @@ final class AppEnvironment {
         }
         state.setLinked(true)
 
+        await restartSync()
+    }
+
+    /// Brings the engine up over the current folder, without re-checking the
+    /// link. Used where the account is known good and only the folder changed.
+    private func restartSync() async {
         guard let coordinator = buildCoordinator() else { return }
         self.coordinator = coordinator
         await coordinator.start()
+    }
+
+    /// Moves the Dropbox folder and points the engine at its new home (ux §4).
+    ///
+    /// Sync stops first and the object graph goes with it: `LocalFileMonitor`
+    /// watches a path, and a watcher left running over a folder being moved
+    /// would report the move as the user deleting everything.
+    ///
+    /// - Throws: `FolderMover.MoveError`, with sync put back where it was.
+    func moveDropboxFolder(to destination: URL) async throws {
+        isBusy = true
+        defer { isBusy = false }
+
+        await coordinator?.stopForQuit()
+        coordinator = nil
+        database = nil
+
+        do {
+            try FolderMover.move(from: dropboxFolderURL, to: destination)
+        } catch {
+            await restartSync()
+            throw error
+        }
+
+        settings.dropboxFolderURL = destination
+        await restartSync()
     }
 
     /// The wizard, built fresh each time it is shown.

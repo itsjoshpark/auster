@@ -24,7 +24,7 @@ struct AusterApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsPlaceholderView(environment: environment)
+            SettingsView(environment: environment)
         }
 
         Window("Sync Issues", id: SyncIssuesWindow.id) {
