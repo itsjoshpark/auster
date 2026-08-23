@@ -146,6 +146,18 @@ final class IntegrationScope {
     /// A local temp directory, for staging downloads and hashing.
     let localRoot: URL
 
+    /// Builds a scope whose remote folder already exists.
+    ///
+    /// Dropbox creates parent folders implicitly on upload, so a scope that only
+    /// ever uploads would not need this — but listing a folder that has never
+    /// been written to answers `path/not_found`, not an empty page, so a test
+    /// that lists before it writes needs the folder to be there.
+    static func make() async throws -> IntegrationScope {
+        let scope = try IntegrationScope()
+        _ = try await scope.service.createFolder(path: scope.remotePath, autorename: false)
+        return scope
+    }
+
     init() throws {
         service = try IntegrationHarness.makeService()
         remotePath = "\(IntegrationHarness.remoteRoot)/\(UUID().uuidString)"
@@ -183,8 +195,18 @@ final class IntegrationScope {
 
     // MARK: - Convenience
 
+    /// `autorename` defaults to `true` because that is what `UploadApplier`
+    /// sends on every upload it makes. It is the difference between Dropbox
+    /// refusing a stale-rev write and Dropbox writing a conflicted copy beside
+    /// the original, so a harness that defaulted the other way would be testing
+    /// a call the engine never issues (note N39).
     @discardableResult
-    func upload(_ name: String, contents: Data, mode: WriteMode = .add) async throws -> RemoteFile {
+    func upload(
+        _ name: String,
+        contents: Data,
+        mode: WriteMode = .add,
+        autorename: Bool = true
+    ) async throws -> RemoteFile {
         let source = local("upload-\(UUID().uuidString)")
         try contents.write(to: source)
         defer { try? FileManager.default.removeItem(at: source) }
@@ -193,7 +215,7 @@ final class IntegrationScope {
             from: source,
             to: remote(name),
             mode: mode,
-            autorename: false,
+            autorename: autorename,
             clientModified: Date(timeIntervalSince1970: 1_700_000_000),
             progress: { _ in }
         )

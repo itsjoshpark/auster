@@ -451,3 +451,28 @@ is the state the update controls were written for in Phase 8: an app installed b
 something other than Sparkle has no updater either. The type was renamed from
 Phase 8's `UpdaterController` to keep it distinct from Sparkle's own
 `SPUStandardUpdaterController`.
+
+### N39. The mock refuses to list a path that is not a folder (Phase 9 follow-up)
+The first run of the integration suite against a real account failed two tests,
+and both failures were in the *test doubles*, not the engine:
+
+- `MockDropboxService.listFolder` answered a listing of a folder that does not
+  exist with an empty page. Dropbox answers `path/not_found`, and
+  `path/not_folder` when a file occupies the path (mapped to `.conflict` by
+  `DropboxErrorMapper`). "No entries under this prefix" and "no such folder" are
+  different facts, and an engine only ever tested against the lenient answer
+  never meets the strict one. The mock now checks the root exists and is a
+  folder; the Dropbox root (`""`) is exempt, since it exists even on an empty
+  account.
+- `IntegrationScope.upload` sent `autorename: false`, but `UploadApplier` sends
+  `autorename: true` on every upload it makes. That is the whole difference
+  between Dropbox *refusing* a stale-rev write and Dropbox writing a conflicted
+  copy beside the original, so the test guarding D9.1 — the no-lost-update
+  guarantee — was exercising a call the engine never issues. Confirmed against
+  the live API: `update(staleRev)` + `autorename: false` → `path/conflict/file`;
+  the same write with `autorename: true` → `name (… conflicted copy).ext`. The
+  engine's behaviour was correct throughout; only the harness was wrong.
+
+`IntegrationScope.make()` also replaces `init()` at the call sites, so each
+scope's remote folder exists before a test lists it — Dropbox creates parents
+implicitly on upload, which is why the gap went unnoticed.
