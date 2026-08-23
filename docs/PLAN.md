@@ -75,7 +75,7 @@ Execute in order; each produces working, testable software and ends with its
 | 7 | Selective sync | [plan/07-selective-sync.md](plan/07-selective-sync.md) | 6 |
 | 8 | App UI | [plan/08-app-ui.md](plan/08-app-ui.md) | 7 |
 | 9 | Hardening & integration tests | [plan/09-hardening-integration.md](plan/09-hardening-integration.md) | 8 |
-| 10 | Distribution | [plan/10-distribution.md](plan/10-distribution.md) | 9 |
+| 10 | Distribution & release automation | [plan/10-distribution.md](plan/10-distribution.md) | 9 |
 
 ## Working agreements
 
