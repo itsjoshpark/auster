@@ -222,4 +222,157 @@ struct SyncDatabaseTests {
             try #expect(db.cachedHash(inode: inode, mtime: mtime) == "abc")
         }
     }
+
+    // MARK: - Sync errors
+
+    private func syncError(
+        _ pathLower: String,
+        direction: SyncDirection = .up,
+        title: String = "Could not upload file"
+    ) -> SyncErrorEntry {
+        SyncErrorEntry(
+            dbxPathLower: pathLower,
+            dbxPath: pathLower,
+            direction: direction,
+            title: title,
+            message: "Dropbox is full."
+        )
+    }
+
+    @Test("A sync error survives a round trip unchanged")
+    func syncErrorRoundTrip() throws {
+        try withDatabase { db, _ in
+            let error = SyncErrorEntry(
+                dbxPathLower: "/a/b.txt",
+                dbxPath: "/A/B.txt",
+                direction: .down,
+                title: "Could not download file",
+                message: "Auster cannot reach Dropbox."
+            )
+            try db.upsertSyncError(error)
+
+            try #expect(db.syncErrors() == [error])
+        }
+    }
+
+    @Test("A second error for the same path replaces the first")
+    func syncErrorUpsertReplaces() throws {
+        try withDatabase { db, _ in
+            try db.upsertSyncError(syncError("/a.txt", title: "First"))
+            try db.upsertSyncError(syncError("/a.txt", title: "Second"))
+
+            try #expect(db.syncErrors().map(\.title) == ["Second"])
+        }
+    }
+
+    @Test("Clearing by path clears that path's subtree and nothing else")
+    func syncErrorClearByPath() throws {
+        try withDatabase { db, _ in
+            for path in ["/a", "/a/b.txt", "/ab.txt", "/c.txt"] {
+                try db.upsertSyncError(syncError(path))
+            }
+
+            try db.clearSyncErrors(pathLower: "/a")
+
+            try #expect(db.syncErrors().map(\.dbxPathLower).sorted() == ["/ab.txt", "/c.txt"])
+        }
+    }
+
+    @Test("Clearing by direction leaves the other direction's errors alone")
+    func syncErrorClearByDirection() throws {
+        try withDatabase { db, _ in
+            try db.upsertSyncError(syncError("/up.txt", direction: .up))
+            try db.upsertSyncError(syncError("/down.txt", direction: .down))
+
+            try db.clearSyncErrors(direction: .down)
+
+            try #expect(db.syncErrors().map(\.dbxPathLower) == ["/up.txt"])
+        }
+    }
+
+    // MARK: - History
+
+    private func history(
+        _ path: String,
+        at timestamp: Date,
+        direction: SyncDirection = .down,
+        change: ChangeType = .added
+    ) -> HistoryEntry {
+        HistoryEntry(
+            direction: direction,
+            changeType: change,
+            itemType: .file,
+            dbxPath: path,
+            size: 128,
+            timestamp: timestamp
+        )
+    }
+
+    @Test("A history entry round trips and gains an id")
+    func historyRoundTrip() throws {
+        try withDatabase { db, _ in
+            let timestamp = Date(timeIntervalSince1970: 1_700_000_000)
+            try db.appendHistory(history("/A/B.txt", at: timestamp, direction: .up, change: .modified))
+
+            let stored = try db.recentHistory(limit: 10)
+            #expect(stored.count == 1)
+            #expect(stored.first?.id != nil)
+            #expect(stored.first?.dbxPath == "/A/B.txt")
+            #expect(stored.first?.direction == .up)
+            #expect(stored.first?.changeType == .modified)
+            #expect(stored.first?.timestamp == timestamp)
+        }
+    }
+
+    @Test("Recent history is newest first and honours the limit")
+    func historyOrdering() throws {
+        try withDatabase { db, _ in
+            let base = Date(timeIntervalSince1970: 1_700_000_000)
+            for offset in 0..<5 {
+                try db.appendHistory(history("/\(offset).txt", at: base.addingTimeInterval(Double(offset))))
+            }
+
+            let recent = try db.recentHistory(limit: 3)
+            #expect(recent.map(\.dbxPath) == ["/4.txt", "/3.txt", "/2.txt"])
+        }
+    }
+
+    @Test("The same path can appear repeatedly — history is a log, not an index")
+    func historyKeepsDuplicates() throws {
+        try withDatabase { db, _ in
+            let base = Date(timeIntervalSince1970: 1_700_000_000)
+            try db.appendHistory(history("/a.txt", at: base, change: .added))
+            try db.appendHistory(history("/a.txt", at: base.addingTimeInterval(1), change: .modified))
+
+            try #expect(db.recentHistory(limit: 10).count == 2)
+        }
+    }
+
+    @Test("Pruning drops entries older than the cutoff")
+    func historyPrunesByAge() throws {
+        try withDatabase { db, _ in
+            let now = Date(timeIntervalSince1970: 1_700_000_000)
+            let cutoff = now.addingTimeInterval(-7 * 24 * 3600)
+            try db.appendHistory(history("/old.txt", at: cutoff.addingTimeInterval(-1)))
+            try db.appendHistory(history("/new.txt", at: now))
+
+            try db.pruneHistory(olderThan: cutoff, keepAtMost: 1_000)
+
+            try #expect(db.recentHistory(limit: 10).map(\.dbxPath) == ["/new.txt"])
+        }
+    }
+
+    @Test("Pruning also caps the total, keeping the newest entries")
+    func historyPrunesByCount() throws {
+        try withDatabase { db, _ in
+            let base = Date(timeIntervalSince1970: 1_700_000_000)
+            for offset in 0..<10 {
+                try db.appendHistory(history("/\(offset).txt", at: base.addingTimeInterval(Double(offset))))
+            }
+
+            try db.pruneHistory(olderThan: base.addingTimeInterval(-1), keepAtMost: 3)
+
+            try #expect(db.recentHistory(limit: 10).map(\.dbxPath) == ["/9.txt", "/8.txt", "/7.txt"])
+        }
+    }
 }

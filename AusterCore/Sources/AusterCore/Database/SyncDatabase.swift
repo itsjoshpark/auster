@@ -242,4 +242,90 @@ public final class SyncDatabase: Sendable {
     private static func column(_ inode: UInt64) -> Int64 {
         Int64(bitPattern: inode)
     }
+
+    // MARK: - Sync errors
+
+    /// Records (or replaces) the failure for a path. Keyed by path, because the
+    /// UI shows one issue per item, not one per attempt.
+    public func upsertSyncError(_ entry: SyncErrorEntry) throws {
+        try pool.write { db in
+            try SyncErrorRecord(entry).save(db)
+        }
+    }
+
+    /// Clears the error for a path and everything under it.
+    ///
+    /// Subtree semantics matter here: re-syncing a folder should clear the
+    /// issues of the children it is about to retry, not just its own.
+    public func clearSyncErrors(pathLower: String) throws {
+        try pool.write { db in
+            guard let (sql, arguments) = Self.subtreeCondition(pathLower) else {
+                _ = try SyncErrorRecord.deleteAll(db)
+                return
+            }
+            _ = try SyncErrorRecord.filter(sql: sql, arguments: arguments).deleteAll(db)
+        }
+    }
+
+    /// Clears every error for one direction, as a sync cycle does before it
+    /// retries the paths it is responsible for.
+    public func clearSyncErrors(direction: SyncDirection) throws {
+        try pool.write { db in
+            _ = try SyncErrorRecord
+                .filter(sql: "direction = ?", arguments: [direction.rawValue])
+                .deleteAll(db)
+        }
+    }
+
+    public func syncErrors() throws -> [SyncErrorEntry] {
+        try pool.read { db in
+            try SyncErrorRecord.fetchAll(db).compactMap(\.entry)
+        }
+    }
+
+    // MARK: - History
+
+    /// Appends a completed sync event. Unlike every other table here this is a
+    /// log: the same path recurs, and the row's identity is its id.
+    public func appendHistory(_ entry: HistoryEntry) throws {
+        try pool.write { db in
+            var record = HistoryRecord(entry)
+            try record.insert(db)
+        }
+    }
+
+    /// The most recent events, newest first.
+    public func recentHistory(limit: Int) throws -> [HistoryEntry] {
+        try pool.read { db in
+            try HistoryRecord
+                .order(sql: "timestamp DESC, id DESC")
+                .limit(limit)
+                .fetchAll(db)
+                .compactMap(\.entry)
+        }
+    }
+
+    /// Trims the log to a retention window and a hard ceiling (engine-doc §1.4:
+    /// one week, at most 1000 entries).
+    ///
+    /// Both bounds are applied — a quiet week must not leave one stale entry
+    /// visible, and a busy hour must not leave ten thousand.
+    public func pruneHistory(olderThan cutoff: Date, keepAtMost limit: Int) throws {
+        try pool.write { db in
+            _ = try HistoryRecord
+                .filter(sql: "timestamp < ?", arguments: [cutoff.timeIntervalSince1970])
+                .deleteAll(db)
+
+            try db.execute(
+                sql: """
+                    DELETE FROM \(HistoryRecord.databaseTableName)
+                    WHERE id NOT IN (
+                        SELECT id FROM \(HistoryRecord.databaseTableName)
+                        ORDER BY timestamp DESC, id DESC LIMIT ?
+                    )
+                    """,
+                arguments: [limit]
+            )
+        }
+    }
 }
