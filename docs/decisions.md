@@ -149,3 +149,37 @@ intercept. `LiveDropboxService` therefore hashes the written file and compares
 it to the metadata's `contentHash`, deleting the file and throwing
 `.dataCorrupted` on a mismatch. Same guarantee — nothing corrupt is ever staged
 for the atomic move (D9.3) — at the cost of one extra read.
+
+### N8. `SyncDatabase.wasResetOnOpen` is a `let`, not `private(set) var` (Phase 3)
+The phase file spells it `public private(set) var`. Swift 6 refuses mutable
+stored state on a `Sendable` class, and the flag is only ever assigned during
+`init`, so it is a `let`. No call site changes.
+
+### N9. `PathStore`'s case cache is a shared reference, not per-copy (Phase 3)
+`PathStore` is a `Sendable` struct as the phase file specifies, but
+`correctCase` needs the ~5000-entry cache from engine-doc §9. A cache stored
+inline would be copied with the struct, so every value passed to a worker would
+start cold and re-issue `metadata` calls. The cache is therefore a small
+`Mutex`-guarded `final class CaseCache` held by reference, so all copies share
+one. Eviction is oldest-insertion-first rather than true LRU: the entries are
+folder casings, which are cheap to re-derive.
+
+### N10. `AppConfig` has non-mutating setters and mirrors, not owns, the exclusions (Phase 3)
+Two consequences of it being a `UserDefaults` façade rather than a stored model:
+
+- Setters are `nonmutating`, so two `AppConfig` values over the same suite can
+  never disagree. The struct is `@unchecked Sendable` because `UserDefaults` is
+  documented thread-safe but not annotated `Sendable`.
+- `excludedItems` here is a *mirror*. The database (`StateKey.excludedItems`) is
+  the source of truth, and Phase 7's selective-sync operation writes both — so
+  `AppConfig` takes no database dependency, and the engine never reads the UI's
+  copy.
+
+### N11. Dates are stored as Unix timestamps, not GRDB's default date strings (Phase 3)
+GRDB encodes `Date` as `"YYYY-MM-DD HH:MM:SS.SSS"` text. The engine compares
+`last_sync` and the hash cache's `mtime` against `stat` timestamps, where the
+sub-second part is what decides whether a file counts as changed, so the record
+types in `Database/Records.swift` store `Double` columns and convert at the
+boundary. This is also why the public model types stay free of GRDB: the
+internal record structs own the column names and the on-disk representation.
+

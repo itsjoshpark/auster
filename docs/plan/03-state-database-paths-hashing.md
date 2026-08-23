@@ -68,7 +68,7 @@ public final class SyncDatabase: Sendable {   // GRDB DatabasePool wrapper
 public enum StateKey: String { case remoteCursor, localCursorTimestamp, didFinishIndexing, indexingCounter, excludedItems /* JSON array */ }
 ```
 
-- [ ] TDD: round-trips for each table; subtree queries match prefix semantics
+- [x] TDD: round-trips for each table; subtree queries match prefix semantics
   (`"/a"` matches `/a` and `/a/b`, not `/ab`); hash cache invalidation on mtime
   change; corruption recovery (write garbage file → init succeeds,
   `wasResetOnOpen == true`). Commit per table group.
@@ -92,7 +92,7 @@ public struct PathStore: Sendable {
 }
 ```
 
-- [ ] TDD: normalization (case + NFD→NFC), round-trip local↔dbx, out-of-root
+- [x] TDD: normalization (case + NFD→NFC), round-trip local↔dbx, out-of-root
   throws, conflicted-copy naming (extension preserved, dotfiles, collision
   suffixes), case-sensitivity probe in a temp dir, `correctCase` resolution order
   (seed index → no service call; unknown parent → one metadata call, cached
@@ -114,7 +114,7 @@ public struct CachedContentHasher: Sendable {                        // hash-cac
 }
 ```
 
-- [ ] TDD: second call with same mtime does not re-read (test via a file removed
+- [x] TDD: second call with same mtime does not re-read (test via a file removed
   after first hash → still returns cached); mtime change → recompute; returns
   `"folder"` for dirs, nil for missing. Commit.
 
@@ -129,4 +129,4 @@ convenience for UI), `notificationsEnabled: Bool`, `notificationsSnoozedUntil:
 Date?`, `updateCheckInterval: enum`, `isPaused: Bool` (persisted pause,
 maestral-ux §9).
 
-- [ ] TDD round-trips + defaults. Commit.
+- [x] TDD round-trips + defaults. Commit.
