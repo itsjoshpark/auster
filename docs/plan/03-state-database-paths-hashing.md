@@ -129,4 +129,4 @@ convenience for UI), `notificationsEnabled: Bool`, `notificationsSnoozedUntil:
 Date?`, `updateCheckInterval: enum`, `isPaused: Bool` (persisted pause,
 maestral-ux §9).
 
-- [ ] TDD round-trips + defaults. Commit.
+- [x] TDD round-trips + defaults. Commit.
