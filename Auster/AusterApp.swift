@@ -5,21 +5,53 @@ import SwiftUI
 /// Auster's entry point.
 ///
 /// The app is a menu-bar-only agent (`LSUIElement`): a `MenuBarExtra` in window
-/// style plus a `Settings` scene. All sync logic lives in `AusterCore`; this
-/// target only renders state and forwards user intent.
+/// style, a `Settings` scene, and two ordinary windows for the things that do
+/// not fit in a menu. All sync logic lives in `AusterCore`; this target only
+/// renders state and forwards user intent.
 @main
 struct AusterApp: App {
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    private var environment: AppEnvironment { appDelegate.environment }
+
     var body: some Scene {
-        MenuBarExtra("Auster", systemImage: "checkmark.circle") {
-            MenuBarContentView(environment: appDelegate.environment)
+        MenuBarExtra {
+            MenuBarView(environment: environment)
+        } label: {
+            StatusIconLabel(environment: environment)
         }
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsPlaceholderView(environment: appDelegate.environment)
+            SettingsView(environment: environment)
+        }
+
+        Window("Sync Issues", id: SyncIssuesWindow.id) {
+            SyncIssuesWindow(environment: environment)
+        }
+        .defaultSize(width: 560, height: 360)
+    }
+}
+
+/// The menu bar's icon, as a view so that it tracks `SyncState`.
+///
+/// A `Scene`'s label is built once per update of the scene, and reading
+/// observable state from inside a view is what guarantees the icon changes when
+/// the status does.
+private struct StatusIconLabel: View {
+
+    @Bindable var environment: AppEnvironment
+
+    var body: some View {
+        let name = StatusIcon.assetName(
+            for: environment.state.status,
+            hasSyncErrors: !environment.state.syncErrors.isEmpty
+        )
+        if let image = StatusIcon.image(named: name) {
+            Image(nsImage: image)
+        } else {
+            Image(systemName: "circle.dashed")
         }
     }
 }
@@ -33,12 +65,12 @@ struct AusterApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
-    let environment = AppEnvironment(link: LinkController.fromBundle())
+    let environment = AppEnvironment.fromBundle()
 
-    private var link: LinkController { environment.link }
+    private let onboardingController = OnboardingWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard link.auth != nil else {
+        guard environment.auth != nil else {
             // Without an app key the app cannot link, and everything else
             // depends on being linked. Say so plainly and stop.
             let alert = NSAlert()
@@ -51,17 +83,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        Task { await environment.start() }
+        // Unlinking from Settings puts the app back where a first launch does.
+        environment.onNeedsSetup = { [weak self] in
+            guard let self else { return }
+            onboardingController.show(environment)
+        }
+
+        Task {
+            await environment.start()
+            // The wizard is the app until it has been through: a menu-bar icon
+            // is not a call to action for someone who has never seen Auster.
+            if environment.state.status == .needsSetup {
+                onboardingController.show(environment)
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        Task {
-            await link.handle(urls)
-            // A successful link is the moment there is something to coordinate.
-            if link.isLinked, environment.coordinator == nil {
-                await environment.start()
-            }
-        }
+        Task { await environment.handleRedirect(urls) }
     }
 
     /// Sync state is persisted incrementally — cursors and index rows are

@@ -1,3 +1,4 @@
+import AusterCore
 import Foundation
 import Testing
 
@@ -9,10 +10,21 @@ import Testing
 @Suite("App shell")
 struct AppShellTests {
 
+    /// A settings object over its own defaults suite, so a test never writes to
+    /// the preferences of whoever is running it.
     @MainActor
-    @Test("Menu bar placeholder builds")
-    func menuBarContentViewBuilds() {
-        _ = MenuBarContentView(environment: AppEnvironment(link: LinkController(auth: nil)))
+    private static func isolatedSettings() -> (AppSettings, String) {
+        let suiteName = "auster-app-tests-\(UUID().uuidString)"
+        return (AppSettings(config: AppConfig(defaults: UserDefaults(suiteName: suiteName)!)), suiteName)
+    }
+
+    @MainActor
+    @Test("The menu bar window builds")
+    func menuBarViewBuilds() {
+        let (settings, suiteName) = Self.isolatedSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        _ = MenuBarView(environment: AppEnvironment(auth: nil, settings: settings))
     }
 
     /// Without an account there is nothing to coordinate, and the interface says
@@ -20,12 +32,52 @@ struct AppShellTests {
     @MainActor
     @Test("An environment with no account needs setting up")
     func unlinkedEnvironmentNeedsSetup() async {
-        let environment = AppEnvironment(link: LinkController(auth: nil))
+        let (settings, suiteName) = Self.isolatedSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let environment = AppEnvironment(auth: nil, settings: settings)
 
         await environment.start()
 
         #expect(environment.state.status == .needsSetup)
         #expect(environment.coordinator == nil)
+    }
+
+    /// Setup is only over once there is *also* somewhere to put the files: a
+    /// linked account with no chosen folder is a half-finished wizard, not a
+    /// working sync (ux §3).
+    @MainActor
+    @Test("An account without a chosen folder still needs setting up")
+    func linkedWithoutFolderNeedsSetup() async {
+        let (settings, suiteName) = Self.isolatedSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let environment = AppEnvironment(auth: nil, settings: settings)
+
+        #expect(settings.dropboxFolderURL == nil)
+        await environment.start()
+
+        #expect(environment.state.status == .needsSetup)
+    }
+
+    /// A snooze is a deadline, not a timer: it has expired once the time has
+    /// passed, whether or not anything was running to notice (ux §2 item 12).
+    @MainActor
+    @Test("Snoozing suppresses notifications until its deadline passes")
+    func snoozeExpiresByItself() {
+        let (settings, suiteName) = Self.isolatedSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
+        #expect(!settings.isSnoozed)
+        settings.snoozeNotifications(for: 1800)
+        #expect(settings.isSnoozed)
+
+        settings.notificationsSnoozedUntil = Date(timeIntervalSinceNow: -1)
+        #expect(!settings.isSnoozed)
+
+        settings.notificationsEnabled = false
+        settings.snoozeNotifications(for: 1800)
+        settings.turnOnNotifications()
+        #expect(!settings.isSnoozed)
+        #expect(settings.notificationsEnabled)
     }
 
     @Test("a build without a real app key is treated as having none")

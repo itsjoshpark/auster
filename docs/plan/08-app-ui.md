@@ -15,7 +15,7 @@ doc.
 `Auster/MenuBar/StatusIcon.swift`, `Auster/MenuBar/RecentChangesSection.swift`;
 modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift`.
 
-- [ ] `StatusIcon.assetName(for: SyncState.Status, hasSyncErrors: Bool) -> String`
+- [x] `StatusIcon.assetName(for: SyncState.Status, hasSyncErrors: Bool) -> String`
   mapping per ux §1 onto the custom template icons from `design/MenuBarIcon/`
   (**copy** the five SVGs into `Assets.xcassets` as **template** image sets,
   rendered at 18×18 pt — `design/` is reference-only and never referenced by
@@ -24,7 +24,7 @@ modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift
   connecting → `menubar-offline`. TDD the mapping incl. the "error badge only
   when idle" rule (engine-doc §10 / cocoa behavior). Syncing stays static in
   v1 (see `design/MenuBarIcon/README.md`).
-- [ ] `MenuBarExtra` window content, top→bottom per ux §2: Open Dropbox Folder /
+- [x] `MenuBarExtra` window content, top→bottom per ux §2: Open Dropbox Folder /
   Launch Dropbox Website / divider / email + usage rows / divider / status row
   (+ inline activity progress rows when syncing, ≤ 5, from `state.activity`) /
   Sync Issues row ("No Sync Issues" disabled or "Show Sync Issues (N)…") /
@@ -34,7 +34,7 @@ modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift
   "snoozed until HH:MM" + turn-on when active) / Rebuild Index (confirmation
   dialog, copy per ux §2 item 13) / divider / Settings… / Check for Updates… /
   divider / Quit (⌘Q, calls `stopForQuit`).
-- [ ] Unlinked variant per ux §2. Commit.
+- [x] Unlinked variant per ux §2. Commit.
 
 ### Task 8.2: Onboarding wizard
 
@@ -43,7 +43,7 @@ modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift
 create `AusterCore/.../State/OnboardingModel.swift`;
 tests `Tests/.../OnboardingModelTests.swift`.
 
-- [ ] `OnboardingModel`: page state machine per ux §3 (welcome → link → folder →
+- [x] `OnboardingModel`: page state machine per ux §3 (welcome → link → folder →
   selective → done), link via `AuthManager` (spinner while awaiting redirect;
   team account → error page with "Not supported: Auster does not support Dropbox
   team accounts."), folder selection (default `~/Dropbox`; existing non-empty →
@@ -51,7 +51,7 @@ tests `Tests/.../OnboardingModelTests.swift`.
   the engine's content-hash checks make it correct), selective page embeds
   `FolderTreeModel` tree, done → persist config + `coordinator.start()`. TDD
   transitions incl. cancel-and-unlink from folder page.
-- [ ] Fixed ~550×400 window shown when `.needsSetup`; closing it quits. Manual
+- [x] Fixed ~550×400 window shown when `.needsSetup`; closing it quits. Manual
   run-through fresh (delete app support + unlink first). Commit.
 
 ### Task 8.3: Settings window
@@ -60,7 +60,7 @@ tests `Tests/.../OnboardingModelTests.swift`.
 `SelectiveSyncTab.swift`, `AccountTab.swift`, `AboutTab.swift`),
 `Auster/Support/LoginItem.swift`, `Auster/Support/FolderMover.swift`.
 
-- [ ] Tabs per ux §4: **General** — folder location picker (move via
+- [x] Tabs per ux §4: **General** — folder location picker (move via
   `FolderMover`: stop sync → `FileManager.moveItem` → update config → start;
   alert on failure/occupied target), Start at login (`SMAppService.mainApp`
   toggle), Notify about remote changes, update-check interval
@@ -79,15 +79,15 @@ tests `Tests/.../OnboardingModelTests.swift`.
 tests `Tests/.../NotificationBatchingTests.swift` (logic extracted to
 `AusterCore/.../State/NotificationComposer.swift`).
 
-- [ ] `NotificationComposer` (pure, TDD): batch → title/body/action per
+- [x] `NotificationComposer` (pure, TDD): batch → title/body/action per
   engine-doc §10 + ux §8 ("You"/name resolution via account cache; 1 item →
   "<who> added <name>" + Show; many → counts; deletions → deleted-files URL;
   conflicts individually; nothing for own uploads — composer only ever receives
   download batches + conflicts by construction). Snooze + master switch
   suppress change notifications, never error ones.
-- [ ] `NotificationManager`: UNUserNotificationCenter; request permission on
+- [x] `NotificationManager`: UNUserNotificationCenter; request permission on
   first notification after setup completes (ux §8); actions open Finder/URLs.
-- [ ] Sync Issues window per ux §6: list rows (icon, name, path, error title +
+- [x] Sync Issues window per ux §6: list rows (icon, name, path, error title +
   message; actions reveal-in-Finder / open on dropbox.com); rows disappear when
   `state.syncErrors` clears. Commit.
 

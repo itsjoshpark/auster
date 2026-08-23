@@ -345,3 +345,39 @@ Two rules that together keep the tree honest:
   each sibling not on the path — which works only because `expand` loads a
   complete level at a time. Where a level was never loaded the exclusion is
   simply dropped: syncing more than asked is the recoverable direction.
+
+### N28. The setup wizard is an AppKit window, not a SwiftUI `Window` scene (Phase 8)
+A `Window` scene can only be opened through `openWindow`, which lives in a
+view's environment — and a menu-bar app has no view on screen until its icon is
+clicked, which is precisely the click a user with nothing set up has no reason to
+make. `OnboardingWindowController` builds an `NSWindow` around an
+`NSHostingView` instead, so the wizard can be on screen at launch. Closing it
+without finishing quits, as ux §3 requires; the last page closes it through a
+callback so that path does not. The Sync Issues window stays a SwiftUI `Window`
+scene, because it is only ever opened from the menu, which *is* a view.
+
+### N29. `LinkController` is gone; `AppEnvironment` owns the link and `AppSettings` mirrors the config (Phase 8)
+Phase 2's `LinkController` existed to drive the debug UI and said so. Its job —
+holding the `AuthManager` and routing OAuth redirects — is now `AppEnvironment`'s,
+which also builds itself from the bundle's app key (`AppEnvironment.fromBundle()`).
+Alongside it, `AppSettings` is a small `@Observable` mirror of the handful of
+`AppConfig` values the interface binds to: `AppConfig` is a `UserDefaults` façade
+and therefore invisible to SwiftUI, so a settings toggle over it would never
+redraw anything. Every property writes straight back, so the defaults stay the
+storage. The selective-sync exclusions deliberately stay out of it (N10).
+
+### N30. `SyncIssuesWindow` was built in Task 8.1 rather than 8.4 (Phase 8)
+The menu's "Show Sync Issues (N)…" row needs somewhere to open, and a row wired
+to a window that does not exist yet is not a commit that works. The window reads
+only `state.syncErrors`, so nothing about it needed Task 8.4's notification
+machinery. `LoginItem` moved earlier for the same reason: the unlinked menu's
+"Start on Login" toggle is part of ux §2.
+
+### N31. Batched notifications count authors by account id, not by resolved name (Phase 8)
+`NotificationComposer` resolves an author's display name from a cache, and
+returns "Someone" when it has none. Deciding whether a batch has one author by
+comparing *names* would collapse two unknown people into one and announce
+"Someone changed 2 files"; it compares account ids instead, and only resolves a
+name once there is exactly one to resolve. An unattributed change is "You" —
+Dropbox reports an author only inside shared folders, and everywhere else nobody
+but the account holder can write.
