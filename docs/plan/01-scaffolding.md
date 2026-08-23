@@ -65,10 +65,10 @@ Modeled on Josh's FrontRow project (reference copy may exist locally at
 `/Users/josh/Developer/FrontRow/.github/workflows/ci.yml`; this task is
 self-contained regardless).
 
-- [ ] `.swift-format`: repo formatting config (defaults + 4-space indent,
+- [x] `.swift-format`: repo formatting config (defaults + 4-space indent,
   120-column line length). All committed Swift must pass
   `swift-format lint -s -p -r ./` from here on.
-- [ ] `ci.yml`: on push to `main` + all PRs; single job on `macos-26`:
+- [x] `ci.yml`: on push to `main` + all PRs; single job on `macos-26`:
   1. checkout; `maxim-lobanov/setup-xcode@v1` with `xcode-version: latest-stable`
   2. `brew install swift-format`
   3. lint: `swift-format lint -s -p -r ./`
