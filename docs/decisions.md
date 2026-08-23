@@ -76,3 +76,36 @@ conflicted copies over overwrites; skip rather than guess).
 3. Downloads are staged to a cache dir on the same volume and moved atomically.
 4. Index/cursor writes happen only after the corresponding change is applied.
 5. Remote deletes of files always use `parentRev` guards.
+
+## Implementation notes
+
+Decisions made during implementation where the plan and research docs were
+silent. These record *what was chosen and why*, not new policy — anything that
+contradicts D1–D9 above is a bug.
+
+### N1. Xcode project is hand-written, with synchronized folder groups (Phase 1)
+`xcodegen` was not installed and the plan allowed generating project files
+directly. `Auster.xcodeproj/project.pbxproj` is checked in and uses
+`PBXFileSystemSynchronizedRootGroup` for `Auster/` and `AusterTests/`: Xcode
+derives target membership from the file system, so later phases add sources
+without editing the project. Consequences: no extra build-tool dependency, and
+`Auster/Resources/Info.plist` needs an explicit membership exception so it is
+not also copied in as a resource.
+
+### N2. An `AusterTests` app-target test bundle exists (Phase 1)
+Phase 1 did not list one, but the CI workflow it specifies runs
+`xcodebuild ... test` against the `Auster` scheme, which needs a testable. The
+bundle is host-based (`TEST_HOST` = `Auster.app`) and currently holds one
+placeholder test; Phase 8's view-model tests belong here. The engine's coverage
+stays in `AusterCoreTests`.
+
+### N3. Swift Testing, not XCTest
+Both test targets use the `Testing` framework (`@Suite`/`@Test`/`#expect`). It
+is built into the toolchain, runs under both `swift test` and `xcodebuild test`,
+and its parallel-by-default execution suits the actor-based engine.
+
+### N4. `DropboxClientsManager.authorizedClient` is not Swift 6 concurrency-safe
+SwiftyDropbox 10.2.4 exposes it as a plain mutable class property, so touching
+it from `AusterCore` fails to compile under language mode 6. Phase 2's
+`DropboxService` must own the client behind its own isolation rather than
+reading that global from arbitrary contexts.
