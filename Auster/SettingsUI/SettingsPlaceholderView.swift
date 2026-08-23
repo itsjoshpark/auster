@@ -1,19 +1,18 @@
+import AusterCore
 import SwiftUI
 
 /// Placeholder settings body.
 ///
 /// Phase 8 replaces this with the General / Selective Sync / Account / About
-/// tabs.
+/// tabs. Until then it carries the one pane that already exists, so selective
+/// sync can be exercised against a real account.
 struct SettingsPlaceholderView: View {
 
-    var body: some View {
-        Text("Auster")
-            .font(.headline)
-            .padding()
-            .frame(width: 420, height: 240)
-    }
-}
+    @Bindable var environment: AppEnvironment
 
-#Preview {
-    SettingsPlaceholderView()
+    var body: some View {
+        SelectiveSyncEditor(environment: environment)
+            .padding()
+            .frame(width: 460, height: 380)
+    }
 }

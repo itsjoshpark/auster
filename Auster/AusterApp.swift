@@ -19,7 +19,7 @@ struct AusterApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsPlaceholderView()
+            SettingsPlaceholderView(environment: appDelegate.environment)
         }
     }
 }

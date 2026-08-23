@@ -53,11 +53,11 @@ tests `Tests/.../FolderTreeModelTests.swift`.
 }
 ```
 
-- [ ] TDD model with mock service: initial states derive from excluded set
+- [x] TDD model with mock service: initial states derive from excluded set
   (off / mixed ancestors); toggle cascades + ancestor recompute; unloaded
   children inherit parent state on load; `resultingExcludedSet` minimal; root
   not excludable (toggling all roots off still yields per-root entries, never "/").
-- [ ] View: `List`/`OutlineGroup`-style tree with checkbox images
+- [x] View: `List`/`OutlineGroup`-style tree with checkbox images
   (`checkmark.square.fill` / `square` / `minus.square.fill`), lazy expansion
   spinner, Apply + Revert buttons calling
   `coordinator.setExcluded(items: model.resultingExcludedSet())`. Manual check
