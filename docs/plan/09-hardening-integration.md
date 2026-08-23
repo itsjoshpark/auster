@@ -32,17 +32,17 @@ remote folder even on failure.
 **Files:** create `Auster/Windows/FatalErrorDialogs.swift`; modify coordinator
 wiring; tests `Tests/.../RecoveryFlowTests.swift` (model logic only).
 
-- [ ] Folder missing (ux §9): dialog "Your Dropbox folder can't be found" with
+- [x] Folder missing (ux §9): dialog "Your Dropbox folder can't be found" with
   three choices — **Locate…** (folder picker; adopt the picked folder as the new
   root, then `rebuildIndex()` so its contents are reconciled safely — identical
   files skipped, differing ones become conflicted copies) / **Recreate** (make
   an empty folder at the configured path, then `rebuildIndex()` → full
   re-download) / **Quit**. TDD the decision model (pure enum-in → actions-out).
-- [ ] `notAuthorized` during sync → pause, menu shows "Please re-link Auster",
+- [x] `notAuthorized` during sync → pause, menu shows "Please re-link Auster",
   menu action runs link flow, resume on success.
-- [ ] `wasResetOnOpen` (DB corruption) → auto full reindex with a notification
+- [x] `wasResetOnOpen` (DB corruption) → auto full reindex with a notification
   ("Rebuilding sync index…"), no dialog.
-- [ ] Single-instance guard at launch (`NSRunningApplication` bundle-id scan →
+- [x] Single-instance guard at launch (`NSRunningApplication` bundle-id scan →
   activate existing, exit). Commit.
 
 ### Task 9.3: Edge-case sweep (unit tests on existing components)

@@ -70,6 +70,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let onboardingController = OnboardingWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // One Auster at a time (ux §9). Two instances over one database and one
+        // watched folder would each see the other's writes as the user's.
+        if case .deferToExisting = SingleInstance.decision(
+            otherProcessIdentifiers: Self.runningAusterProcesses(),
+            current: ProcessInfo.processInfo.processIdentifier
+        ) {
+            Self.activateExistingInstance()
+            NSApp.terminate(nil)
+            return
+        }
+
         guard environment.auth != nil else {
             // Without an app key the app cannot link, and everything else
             // depends on being linked. Say so plainly and stop.
@@ -89,6 +100,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onboardingController.show(environment)
         }
 
+        environment.observeFatalErrors()
+
         Task {
             await environment.start()
             // The wizard is the app until it has been through: a menu-bar icon
@@ -101,6 +114,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         Task { await environment.handleRedirect(urls) }
+    }
+
+    /// Every process claiming Auster's bundle id, this one included — the
+    /// decision of what to do about that is `SingleInstance`'s.
+    private static func runningAusterProcesses() -> [pid_t] {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return [] }
+        return
+            NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .map(\.processIdentifier)
+    }
+
+    private static func activateExistingInstance() {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }?
+            .activate()
     }
 
     /// Sync state is persisted incrementally — cursors and index rows are
