@@ -132,7 +132,7 @@ SyncEngine; helpers `remoteWrite/localWrite/runDownloadCycle/runUploadCycle/
 runCatchUp`, and assertion `assertConverged()` (local tree == remote tree ==
 index; every file's hash consistent).
 
-- [ ] Scenarios (each a test): remote-only changes converge; local-only changes
+- [x] Scenarios (each a test): remote-only changes converge; local-only changes
   converge; **echo test** — downloadCycle's FS mutations produce zero upload
   events through the real IgnoreFilter + monitor wiring; both-sides-different
   edit → exactly one conflicted copy, both contents preserved; local edit +

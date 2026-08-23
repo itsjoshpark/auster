@@ -125,8 +125,18 @@ public struct LocalFileOperations: Sendable {
             try? FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: source.path)
         }
 
+        // Three declarations for one operation, because `rename(2)` is reported
+        // differently depending on what was there: as a rename of the staged
+        // file onto the destination, or as a creation or modification of the
+        // destination itself. All three are this operation's echo.
         try ignore.ignoring(
             [
+                ExpectedFSEvent(
+                    kind: .moved(to: destination),
+                    url: source,
+                    isDirectory: false,
+                    recursive: false
+                ),
                 expected(.created, destination, isDirectory: false),
                 expected(.modified, destination, isDirectory: false),
             ]
@@ -203,12 +213,16 @@ public struct LocalFileOperations: Sendable {
             withIntermediateDirectories: true
         )
 
-        try ignore.ignoring(
-            [expected(.deleted, url, isDirectory: false), expected(.created, url, isDirectory: false)]
-        ) {
-            if (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil {
+        // Two declarations in two calls, because these really are two events:
+        // one `ignoring` call declares alternative descriptions of one event.
+        // The deletion is only declared when there is something to delete, so no
+        // expectation is left waiting for an event that never comes.
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil {
+            try ignore.ignoring([expected(.deleted, url, isDirectory: false)]) {
                 try FileManager.default.removeItem(at: url)
             }
+        }
+        try ignore.ignoring([expected(.created, url, isDirectory: false)]) {
             try FileManager.default.createSymbolicLink(atPath: url.path, withDestinationPath: target)
         }
     }

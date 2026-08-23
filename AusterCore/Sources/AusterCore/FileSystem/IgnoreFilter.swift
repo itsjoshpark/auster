@@ -31,6 +31,9 @@ public final class IgnoreFilter: FileEventIgnoring, @unchecked Sendable {
 
     private struct Registration {
         let expected: ExpectedFSEvent
+        /// Which `ignoring` call this came from, so the alternatives declared by
+        /// one operation can be retired together.
+        let callID: Int
         /// `nil` while the operation is still running — an unfinished operation
         /// can never be stale.
         var expiresAt: Date?
@@ -55,10 +58,12 @@ public final class IgnoreFilter: FileEventIgnoring, @unchecked Sendable {
     // MARK: - Declaring
 
     public func ignoring<T>(_ expected: [ExpectedFSEvent], _ body: () throws -> T) rethrows -> T {
-        let ids = lock.withLock {
-            expected.map { event -> Int in
+        let ids = lock.withLock { () -> [Int] in
+            nextID += 1
+            let callID = nextID
+            return expected.map { event -> Int in
                 nextID += 1
-                registrations[nextID] = Registration(expected: event, expiresAt: nil)
+                registrations[nextID] = Registration(expected: event, callID: callID, expiresAt: nil)
                 return nextID
             }
         }
@@ -88,11 +93,23 @@ public final class IgnoreFilter: FileEventIgnoring, @unchecked Sendable {
         return lock.withLock {
             discardExpired(asOf: currentTime)
 
-            guard let id = registrations.first(where: { Self.matches($0.value.expected, event) })?.key else {
+            guard let id = registrations.first(where: { Self.matches($0.value.expected, event) })?.key,
+                let matched = registrations[id]
+            else {
                 return false
             }
-            if !registrations[id]!.expected.recursive {
-                registrations[id] = nil
+            guard !matched.expected.recursive else { return true }
+
+            // Matching one declaration retires all of them from that call. The
+            // several declarations of one operation are alternative *descriptions*
+            // of a single event — a `rename(2)` over an existing file surfaces as
+            // a rename of the source, or a creation of the destination, or a
+            // modification of it, depending on what was there and how FSEvents
+            // chose to coalesce. Exactly one arrives; leaving the others
+            // registered would let them swallow the user's next edit to the same
+            // file, seconds later.
+            registrations = registrations.filter { _, registration in
+                registration.callID != matched.callID
             }
             return true
         }

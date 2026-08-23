@@ -85,14 +85,45 @@ struct IgnoreFilterTests {
         #expect(!IgnoreFilter().shouldDrop(raw(.modified, "a.txt")))
     }
 
-    @Test("Declaring several events drops each of them once")
-    func multipleDeclarations() {
-        let filter = IgnoreFilter()
-        filter.ignoring([expected(.created, "a.txt"), expected(.modified, "a.txt")]) {}
+    /// One `rename(2)` surfaces as a rename, a creation, or a modification
+    /// depending on what was there and how FSEvents coalesced — so an operation
+    /// declares all of them, and exactly one arrives.
+    @Test("The events declared by one call are alternatives, and any of them matches")
+    func declarationsAreAlternatives() {
+        for arriving in [RawFSEvent.Kind.created, .modified] {
+            let filter = IgnoreFilter()
+            filter.ignoring([expected(.created, "a.txt"), expected(.modified, "a.txt")]) {}
 
+            #expect(filter.shouldDrop(RawFSEvent(kind: arriving, url: url("a.txt"), isDirectory: false)))
+        }
+    }
+
+    /// The failure this prevents: a download declares three ways of describing
+    /// its write, one of them matches, and the leftovers sit there for two
+    /// seconds waiting to swallow whatever the user does to that file next.
+    @Test("Matching one declaration retires the alternatives it was declared with")
+    func matchingRetiresTheAlternatives() {
+        let filter = IgnoreFilter()
+        filter.ignoring([
+            ExpectedFSEvent(kind: .moved(to: url("a.txt")), url: url("staged"), isDirectory: false, recursive: false),
+            expected(.created, "a.txt"),
+            expected(.modified, "a.txt"),
+        ]) {}
+
+        #expect(filter.shouldDrop(raw(.moved(to: url("a.txt")), "staged")))
+        // The user's own edit, moments later, must get through.
+        #expect(!filter.shouldDrop(raw(.modified, "a.txt")))
+        #expect(filter.registrationCount == 0)
+    }
+
+    @Test("Separate calls each drop their own event")
+    func separateCallsAreIndependent() {
+        let filter = IgnoreFilter()
+        filter.ignoring([expected(.deleted, "a.txt")]) {}
+        filter.ignoring([expected(.created, "a.txt")]) {}
+
+        #expect(filter.shouldDrop(raw(.deleted, "a.txt")))
         #expect(filter.shouldDrop(raw(.created, "a.txt")))
-        #expect(filter.shouldDrop(raw(.modified, "a.txt")))
-        #expect(!filter.shouldDrop(raw(.created, "a.txt")))
     }
 
     // MARK: - Moves

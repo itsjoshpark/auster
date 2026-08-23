@@ -218,8 +218,35 @@ public final class LocalFileMonitor: @unchecked Sendable {
     }
 
     private func emit(_ event: RawFSEvent) {
+        guard !isExcluded(event) else { return }
         guard !ignore.shouldDrop(event) else { return }
         continuation.yield(event)
+    }
+
+    /// Whether the event concerns something Auster never syncs.
+    ///
+    /// Filtered here rather than downstream because the staging directory lives
+    /// *inside* the watched folder: every download writes, stamps and renames a
+    /// file in there, and all of that would otherwise arrive as local activity.
+    ///
+    /// A move is judged by where the item ended up — a file arriving out of
+    /// excluded space into the folder is a creation worth reporting, even though
+    /// its source was not.
+    private func isExcluded(_ event: RawFSEvent) -> Bool {
+        if case .moved(let destination) = event.kind {
+            return isExcluded(destination)
+        }
+        return isExcluded(event.url)
+    }
+
+    /// Judges the path *relative to the folder*, so a Dropbox folder that
+    /// happens to sit inside a directory called `.dropbox` is not excluded
+    /// wholesale.
+    private func isExcluded(_ url: URL) -> Bool {
+        let components = url.standardizedFileURL.pathComponents
+        let rootComponents = root.pathComponents
+        guard components.count > rootComponents.count else { return false }
+        return components.dropFirst(rootComponents.count).contains { Exclusions.isExcludedName($0) }
     }
 
     private static func isRename(_ flags: FSEventStreamEventFlags) -> Bool {
