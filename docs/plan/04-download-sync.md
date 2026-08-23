@@ -43,7 +43,7 @@ deleted; per engine-doc §1.4 notes) — async because of `correctCase`.
   per §4.2. TDD: multiple entries per path keep last; type change (index folder,
   last entry file) synthesizes deleted-before-file; single entries untouched;
   order by depth afterwards is caller's job.
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 4.2: SyncEngine skeleton + download conflict table
 
@@ -128,7 +128,7 @@ static func isExcludedName(_ pathOrName: String) -> Bool  // engine-doc §8 list
 static func isExcluded(byUser dbxPathLower: String, excluded: Set<String>) -> Bool  // path == or child of any excluded entry
 }`
 
-- [ ] TDD: every name in the §8 list; `~$doc.docx`, `.~lock`, `~x.tmp` patterns;
+- [x] TDD: every name in the §8 list; `~$doc.docx`, `.~lock`, `~x.tmp` patterns;
   `Icon\r`; user exclusion child/exact matching (`"/a"` excludes `/a/b`, not
   `/ab`). Commit.
 
