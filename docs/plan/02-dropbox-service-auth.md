@@ -87,8 +87,8 @@ public enum DropboxServiceError: Error, Sendable, Equatable {
 }
 ```
 
-- [ ] TDD model conveniences (pathLower accessor, `RemoteMetadata` equality).
-- [ ] Commit.
+- [x] TDD model conveniences (pathLower accessor, `RemoteMetadata` equality).
+- [x] Commit.
 
 ### Task 2.2: Mock service
 
