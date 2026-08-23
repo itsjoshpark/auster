@@ -60,6 +60,22 @@ final class AppEnvironment {
         await coordinator?.stopForQuit()
     }
 
+    // MARK: - Selective sync
+
+    /// A folder tree seeded with the selection the engine is currently using.
+    ///
+    /// Seeded from `AppConfig` rather than the database: the mirror exists for
+    /// exactly this (implementation note N10), and the UI has no business
+    /// opening the engine's tables.
+    func makeFolderTreeModel() -> FolderTreeModel? {
+        guard let service = link.service else { return nil }
+        return FolderTreeModel(service: service, excluded: AppConfig().excludedItems)
+    }
+
+    func setExcluded(_ items: Set<String>) async {
+        await coordinator?.setExcluded(items: items)
+    }
+
     /// Unlinks and tears the graph down, returning the app to setup.
     func unlink() async {
         await coordinator?.stopForQuit()

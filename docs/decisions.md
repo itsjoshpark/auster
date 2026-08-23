@@ -317,3 +317,31 @@ failures and recovers by retrying, so `NWPathMonitor` is not load-bearing; what
 it adds is knowing the moment Wi-Fi returns rather than at the end of the next
 backoff. It sits behind `ConnectionMonitoring` and is `nil` in tests, which is
 why none of the lifecycle tests depend on real network state.
+
+### N26. Selective sync splits into pure algebra and an engine-side application (Phase 7)
+The phase file puts the logic in `Coordination/SelectiveSync.swift`. It ended up
+in two pieces, because the two halves fail differently: `SelectiveSync` is total,
+pure set arithmetic (normalize → minimal set → delta of newly excluded / newly
+included), while the half that touches the user's files —
+`SyncEngine.removeExcluded(dbxPathLower:)` — lives on the engine actor. Local
+deletion and index pruning mutate exactly what a sync cycle mutates, so they have
+to share its isolation; doing them from the coordinator would let a cycle
+interleave with them. `SyncCoordinator.setExcluded(items:)` orders the three
+steps: persist the selection first (so an interruption leaves the engine
+filtering by what the user asked for), then apply exclusions, then *queue*
+inclusions before fetching any of them.
+
+### N27. A mixed checkbox includes; every node's state is derived, never stored (Phase 7)
+Two rules that together keep the tree honest:
+
+- `FolderTreeModel` stores only the excluded set. `checkState` is recomputed for
+  every loaded node whenever that set changes, so what the user sees and what
+  `resultingExcludedSet()` would hand the engine cannot drift apart. A parent
+  whose loaded children are all excluded therefore reads `.mixed`, not `.off` —
+  the state the same selection would produce if it were reloaded from scratch,
+  and honest about the parent's own files still syncing.
+- Toggling a `.mixed` box includes rather than excludes. Re-including a folder
+  whose *ancestor* is excluded pushes that exclusion one level down, re-excluding
+  each sibling not on the path — which works only because `expand` loads a
+  complete level at a time. Where a level was never loaded the exclusion is
+  simply dropped: syncing more than asked is the recoverable direction.

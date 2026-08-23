@@ -23,7 +23,7 @@ persistent pending-downloads queue; coordinator's drain task picks them up
 upload-side "(selective sync conflict)" rename already exist (Phases 4/5) and
 read the same set.
 
-- [ ] TDD: exclude removes local + index, set persisted lowercased/minimal;
+- [x] TDD: exclude removes local + index, set persisted lowercased/minimal;
   include triggers queued download (assert via pending queue + drained mock);
   nested exclude/include set algebra; scenario: exclude → remote edits under it
   ignored → include → full subtree restored converged; restart mid-include
@@ -53,11 +53,11 @@ tests `Tests/.../FolderTreeModelTests.swift`.
 }
 ```
 
-- [ ] TDD model with mock service: initial states derive from excluded set
+- [x] TDD model with mock service: initial states derive from excluded set
   (off / mixed ancestors); toggle cascades + ancestor recompute; unloaded
   children inherit parent state on load; `resultingExcludedSet` minimal; root
   not excludable (toggling all roots off still yields per-root entries, never "/").
-- [ ] View: `List`/`OutlineGroup`-style tree with checkbox images
+- [x] View: `List`/`OutlineGroup`-style tree with checkbox images
   (`checkmark.square.fill` / `square` / `minus.square.fill`), lazy expansion
   spinner, Apply + Revert buttons calling
   `coordinator.setExcluded(items: model.resultingExcludedSet())`. Manual check

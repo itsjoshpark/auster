@@ -199,10 +199,7 @@ public actor SyncCoordinator {
             }
 
             // 4. Folders the user re-selected but that were never fetched.
-            for path in try database.pendingDownloads() {
-                try await engine.fetchRemoteItem(dbxPathLower: path)
-                try database.removePendingDownload(path)
-            }
+            try await drainPendingDownloads()
 
             // 5 and 6. Remote first, so the local scan diffs against an index
             //    that already knows about it (§3).
@@ -275,14 +272,51 @@ public actor SyncCoordinator {
         await start()
     }
 
-    /// Phase 7 replaces this with the real selective-sync operation — deleting
-    /// newly excluded folders locally, queueing newly included ones. For now it
-    /// only records the choice in both places that hold it (implementation note
-    /// N10: the database is the source of truth, the config is the UI's mirror).
+    /// Applies a new selective-sync selection (engine-doc §8).
+    ///
+    /// The order is the whole safety argument. The selection is persisted
+    /// *first*, so that an interruption anywhere after this point leaves the
+    /// engine filtering by what the user asked for rather than by what it used
+    /// to sync. Exclusions are then applied — local copies deleted, index
+    /// subtrees pruned — and inclusions are only ever *queued*: the queue is a
+    /// table, so a folder the user re-selected is fetched on the next start even
+    /// if this one never gets that far.
+    ///
+    /// Never throws. A failure here means one folder did not finish changing
+    /// state, which the funnel reports the same way it reports any other; the
+    /// caller is a checkbox, and has nothing better to do with an error.
     public func setExcluded(items: Set<String>) async {
-        let normalized = Set(items.map(PathStore.normalize))
-        try? database.setExcludedItems(normalized)
-        await MainActor.run { config.excludedItems = normalized }
+        let current = (try? database.excludedItems()) ?? []
+        let delta = SelectiveSync.delta(current: current, requested: items)
+
+        try? database.setExcludedItems(delta.excluded)
+        await MainActor.run { config.excludedItems = delta.excluded }
+
+        do {
+            for path in delta.newlyExcluded {
+                try await engine.removeExcluded(dbxPathLower: path)
+            }
+            // Queued before any of them is fetched, so an interruption partway
+            // through resumes rather than silently leaving a folder empty
+            // (engine-doc §1.5).
+            for path in delta.newlyIncluded {
+                try database.addPendingDownload(path)
+            }
+            try await drainPendingDownloads()
+        } catch {
+            await handle(error)
+        }
+
+        await refreshLists()
+    }
+
+    /// Fetches everything on the pending-downloads queue, taking each path off
+    /// only once its bytes are on disk.
+    private func drainPendingDownloads() async throws {
+        for path in try database.pendingDownloads() {
+            try await engine.fetchRemoteItem(dbxPathLower: path)
+            try database.removePendingDownload(path)
+        }
     }
 
     // MARK: - Loops (§2)
@@ -401,6 +435,11 @@ public actor SyncCoordinator {
             notifier.notifyDownloadBatch(downloads)
         }
 
+        await refreshLists()
+    }
+
+    /// Republishes the lists the UI reads, and returns the status to rest.
+    private func refreshLists() async {
         let history = (try? database.recentHistory(limit: 30)) ?? []
         let errors = (try? database.syncErrors()) ?? []
         await MainActor.run {
