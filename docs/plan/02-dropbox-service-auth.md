@@ -103,12 +103,12 @@ list/continue over the change log, autorename semantics (`" (2)"`, conflicted
 copies for `.update` mismatches per api-notes §2), `parentRev`-guarded deletes.
 Configurable per-call error injection: `mock.failNext(.upload, with: .connection)`.
 
-- [ ] TDD the fake's own semantics (they're the contract later scenario tests
+- [x] TDD the fake's own semantics (they're the contract later scenario tests
   trust): add→list shows entry; update with stale rev + autorename → server-style
   conflicted copy name; delete with wrong parentRev → `.conflict`; continue after
   changes returns only the delta; move reports delete+add in the change log
   (mirrors real Dropbox — moves are never reported as moves, api-notes §3).
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 2.3: Content hasher + live service
 
