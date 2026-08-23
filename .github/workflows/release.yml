@@ -1,0 +1,439 @@
+# Builds, signs, notarizes, and publishes a release, then adds it to the Sparkle
+# appcast. Triggered by hand from the Actions tab:
+#
+#         1. Write the release notes to .sparkle/notes/next.md and push them
+#         2. Run this workflow with dry-run checked, to prove the build
+#         3. Run it again with dry-run unchecked, choosing patch/minor/major
+#
+# The notes go to GitHub as Markdown and to the appcast as HTML, rendered by
+# cmark-gfm so both read the same.
+#
+# The marketing version is read from Config/Shared.xcconfig and bumped by the
+# chosen amount; the build number is the commit count and is never read back as
+# input. Both are passed to xcodebuild, then written back to the xcconfig in the
+# same commit as the appcast — so a local build always reports what last shipped.
+#
+# Nothing outside the runner is touched until notarization succeeds, so a failed
+# run leaves no tag, no release, and no feed change behind — just run it again.
+#
+# 🚨 GITHUB SECRETS REQUIRED (see docs/release-process.md):
+#         - DEVELOPER_ID_CERT_P12_BASE64: Developer ID Application certificate
+#           exported from Keychain Access with its private key, as .p12, then
+#           `base64 -i cert.p12 | pbcopy`
+#         - DEVELOPER_ID_CERT_PASSWORD: the password set during that export
+#         - AC_API_KEY_P8_BASE64: App Store Connect API key (.p8), base64 encoded
+#         - AC_API_KEY_ID / AC_API_ISSUER_ID: shown alongside that key
+#         - SPARKLE_ED_PRIVATE_KEY: EdDSA key, via `generate_keys -x key.txt`
+#
+# The certificate expires (5 years); the API key and the EdDSA key do not.
+
+name: 🚀 Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-type:
+        type: choice
+        description: "Choose release type: major, minor, patch"
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      dry-run:
+        type: boolean
+        description: "Build and notarize only — no tag, release, or appcast update"
+        required: false
+        default: false
+
+# Two runs would resolve the same tag and build number, both pass the guards
+# below, then collide at the tag and the appcast push.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: macos-26
+    permissions:
+      contents: write
+    env:
+      TEAM_ID: TCQ6328PP6
+      CONFIG: Config/Shared.xcconfig
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # A shallow clone makes `git rev-list --count` return 1, which is below
+          # the shipped build number and would strand every existing user.
+          fetch-depth: 0
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: latest-stable
+
+      # Build output stays outside the workspace: SPM checks Sparkle out under
+      # the derived data path, and nothing that walks the repository — a lint, a
+      # `git add` — has any business finding it. The runner context is not
+      # available in job-level env, so these are set here.
+      - name: Set build paths
+        run: |
+          set -euo pipefail
+          {
+            echo "ARCHIVE_PATH=$RUNNER_TEMP/build/Auster.xcarchive"
+            echo "EXPORT_PATH=$RUNNER_TEMP/build/export"
+            echo "DERIVED_DATA=$RUNNER_TEMP/build/DerivedData"
+          } >>"$GITHUB_ENV"
+
+      - name: Install cmark-gfm
+        run: brew install cmark-gfm
+
+      # Before anything depends on these scripts.
+      - name: Verify the release scripts pass their tests
+        run: |
+          Scripts/release/bump-version.test.sh
+          Scripts/release/project-version.test.sh
+          Scripts/release/render-notes.test.sh
+          Scripts/release/append-appcast-item.test.sh
+
+      # Everything below the build is expensive; fail here instead.
+      - name: Resolve version and build number
+        id: version
+        run: |
+          set -euo pipefail
+
+          # The appcast is published from main (SUFeedURL points at
+          # raw/main/.sparkle/appcast.xml). Releasing from anywhere else would
+          # tag and publish, then strand the feed entry on a side branch.
+          if [[ "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "::error::Releases must be run from main, not $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+          # The marketing version is authoritative in the xcconfig; the build
+          # number is mechanical and never read back as input.
+          current="$(Scripts/release/project-version.sh read-marketing "$CONFIG")"
+          version="$(Scripts/release/bump-version.sh "$current" "${{ inputs.release-type }}")"
+          build="$(git rev-list --count HEAD)"
+
+          if git rev-parse "v$version" >/dev/null 2>&1; then
+            echo "::error::Tag v$version already exists"
+            exit 1
+          fi
+
+          # An empty feed has no newest entry — that is the first release.
+          newest="$(grep -o '<sparkle:version>[0-9]*</sparkle:version>' .sparkle/appcast.xml |
+            grep -o '[0-9]*' | sort -n | tail -1 || true)"
+          if [[ -n "$newest" ]] && (( build <= newest )); then
+            echo "::error::Build number $build does not exceed the newest appcast entry ($newest). Sparkle would never offer this update."
+            exit 1
+          fi
+
+          notes=".sparkle/notes/next.md"
+          if [[ ! -f "$notes" ]]; then
+            echo "::error::Missing $notes. Copy .sparkle/notes/TEMPLATE.md to it and write the release notes."
+            exit 1
+          fi
+          if cmp -s "$notes" .sparkle/notes/TEMPLATE.md; then
+            echo "::error::$notes is still the unedited template. Write the release notes before releasing."
+            exit 1
+          fi
+          if [[ -e ".sparkle/notes/$version.md" ]]; then
+            echo "::error::.sparkle/notes/$version.md already exists, so the archived notes for this release would be overwritten."
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "build=$build"
+            echo "notes=$notes"
+            echo "dmg=Auster_v$version.dmg"
+          } >>"$GITHUB_OUTPUT"
+
+          echo "Releasing $version ($build), bumped from $current"
+
+      # GitHub gets the Markdown as written; the appcast gets this. Rendered here
+      # so malformed notes fail before the build rather than after it.
+      - name: Render the release notes for the appcast
+        run: |
+          set -euo pipefail
+          html="$RUNNER_TEMP/notes.html"
+          Scripts/release/render-notes.sh "${{ steps.version.outputs.notes }}" >"$html"
+          echo "NOTES_HTML=$html" >>"$GITHUB_ENV"
+          cat "$html"
+
+      - name: Prepare the App Store Connect API key
+        env:
+          AC_API_KEY_P8_BASE64: ${{ secrets.AC_API_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$AC_API_KEY_P8_BASE64" | base64 --decode >"$key"
+          chmod 600 "$key"
+          [[ -s "$key" ]] || { echo "::error::AC_API_KEY_P8_BASE64 decoded to an empty file"; exit 1; }
+          echo "AC_KEY_PATH=$key" >>"$GITHUB_ENV"
+
+      - name: Import the signing certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          # An ephemeral keychain, discarded with the runner, so the password
+          # only has to be unguessable for this run. The login keychain is never
+          # touched.
+          keychain_password="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+
+          printf '%s' "$CERT_P12_BASE64" | base64 --decode >"$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychain -d user -s "$keychain" login.keychain-db
+
+      # Cheap checks, before the ~15 minute build.
+      - name: Preflight — verify the credentials
+        env:
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/build.keychain-db"
+
+          identity="$(security find-identity -v -p codesigning "$keychain" |
+            sed -n 's/.*"\(Developer ID Application[^"]*\)".*/\1/p' | head -1)"
+          if [[ -z "$identity" ]]; then
+            echo "::error::No Developer ID Application identity in the keychain. Check DEVELOPER_ID_CERT_P12_BASE64 and DEVELOPER_ID_CERT_PASSWORD, and that the .p12 was exported with its private key."
+            security find-identity -v "$keychain" || true
+            exit 1
+          fi
+          echo "Signing identity: $identity"
+
+          # Diagnostic only: an unreadable certificate warns, but an expired one
+          # stops the build.
+          certs="$RUNNER_TEMP/certcheck"
+          rm -rf "$certs" && mkdir -p "$certs"
+          expiry=""
+          if security find-certificate -c "$identity" -p "$keychain" >"$certs/cert.pem" 2>/dev/null &&
+            [[ -s "$certs/cert.pem" ]]; then
+            expiry="$(openssl x509 -in "$certs/cert.pem" -noout -enddate 2>/dev/null | cut -d= -f2 || true)"
+          fi
+          expiry_epoch="$(date -j -f "%b %d %T %Y %Z" "$expiry" +%s 2>/dev/null || echo 0)"
+          if (( expiry_epoch > 0 )); then
+            days=$(( (expiry_epoch - $(date +%s)) / 86400 ))
+            echo "Certificate expires in $days days ($expiry)"
+            if (( days < 0 )); then
+              echo "::error::The signing certificate expired on $expiry. Create a new Developer ID Application certificate and update DEVELOPER_ID_CERT_P12_BASE64."
+              exit 1
+            elif (( days < 30 )); then
+              echo "::warning::The signing certificate expires in $days days ($expiry). Renew it before the next release."
+            fi
+          else
+            echo "::warning::Could not parse the certificate expiry ('$expiry')"
+          fi
+
+          if ! xcrun notarytool history \
+            --key "$AC_KEY_PATH" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" \
+            >/dev/null 2>&1; then
+            echo "::error::The App Store Connect API key was rejected. Check AC_API_KEY_P8_BASE64, AC_API_KEY_ID, and AC_API_ISSUER_ID, and that the key has not been revoked."
+            exit 1
+          fi
+          echo "App Store Connect API key accepted"
+
+      # A release Auster cannot link an account with is not a release. The key is
+      # not a cryptographic secret (decisions D3), but it is per-developer, so it
+      # comes from a repository secret rather than the repository.
+      - name: Write the Dropbox app key
+        env:
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$DROPBOX_APP_KEY" ]] ||
+            { echo "::error::DROPBOX_APP_KEY is not set. A build without it cannot link an account."; exit 1; }
+          printf 'DROPBOX_APP_KEY = %s\n' "$DROPBOX_APP_KEY" >Config/Secrets.xcconfig
+
+      - name: Archive
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project Auster.xcodeproj \
+            -scheme Auster \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -archivePath "$ARCHIVE_PATH" \
+            -derivedDataPath "$DERIVED_DATA" \
+            CURRENT_PROJECT_VERSION=${{ steps.version.outputs.build }} \
+            MARKETING_VERSION=${{ steps.version.outputs.version }} \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            DEVELOPMENT_TEAM="$TEAM_ID"
+
+      - name: Export the archive
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist .github/ExportOptions.plist
+
+      - name: Verify the exported app
+        run: |
+          set -euo pipefail
+          app="$EXPORT_PATH/Auster.app"
+          plist="$app/Contents/Info.plist"
+          actual_build="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$plist")"
+          actual_version="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$plist")"
+
+          [[ "$actual_build" == "${{ steps.version.outputs.build }}" ]] ||
+            { echo "::error::CFBundleVersion is $actual_build, expected ${{ steps.version.outputs.build }}"; exit 1; }
+          [[ "$actual_version" == "${{ steps.version.outputs.version }}" ]] ||
+            { echo "::error::CFBundleShortVersionString is $actual_version, expected ${{ steps.version.outputs.version }}"; exit 1; }
+
+          # A build whose public key is still the committed placeholder would
+          # ship an app that can never accept an update.
+          public_key="$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$plist")"
+          case "$public_key" in
+            replace_with_* | "")
+              echo "::error::SUPublicEDKey is '$public_key'. Set SU_PUBLIC_ED_KEY in Config/Shared.xcconfig to the key printed by Sparkle's generate_keys."
+              exit 1
+              ;;
+          esac
+
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+          # The archive may carry a development signature; only the export
+          # re-signs for distribution.
+          authority="$(codesign -dvvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+          case "$authority" in
+            "Developer ID Application"*) ;;
+            *) echo "::error::Signed by '$authority', expected a Developer ID Application certificate"; exit 1 ;;
+          esac
+
+          echo "Verified $actual_version ($actual_build), signed by: $authority"
+
+      - name: Create the dmg
+        run: |
+          set -euo pipefail
+          # sindresorhus/create-dmg, not the similarly named Homebrew formula —
+          # they take different flags.
+          npm install -g create-dmg
+          brew install graphicsmagick imagemagick
+
+          cd "$EXPORT_PATH"
+          create-dmg --no-code-sign "Auster.app"
+          mv ./*.dmg "${{ steps.version.outputs.dmg }}"
+
+      - name: Notarize and staple
+        env:
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          dmg="$EXPORT_PATH/${{ steps.version.outputs.dmg }}"
+          xcrun notarytool submit "$dmg" \
+            --key "$AC_KEY_PATH" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" \
+            --wait
+
+          xcrun stapler staple "$dmg"
+          xcrun stapler validate "$dmg"
+
+      - name: Remove the API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Upload the dmg as an artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.version.outputs.dmg }}
+          path: ${{ env.EXPORT_PATH }}/${{ steps.version.outputs.dmg }}
+
+      # ---- Nothing above this line changes anything outside the runner. ----
+
+      - name: Tag and create the GitHub release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          version="${{ steps.version.outputs.version }}"
+          git tag "v$version"
+          git push origin "v$version"
+
+          gh release create "v$version" \
+            "$EXPORT_PATH/${{ steps.version.outputs.dmg }}" \
+            --title "v$version" \
+            --notes-file "${{ steps.version.outputs.notes }}"
+
+      - name: Publish to the appcast and record the version
+        if: ${{ !inputs.dry-run }}
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          dmg="$EXPORT_PATH/${{ steps.version.outputs.dmg }}"
+          sign_update="$DERIVED_DATA/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+
+          # Prints: sparkle:edSignature="..." length="..."
+          signed="$(printf '%s\n' "$SPARKLE_ED_PRIVATE_KEY" | "$sign_update" --ed-key-file - "$dmg")"
+          signature="$(sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p' <<<"$signed")"
+          length="$(sed -n 's/.*length="\([^"]*\)".*/\1/p' <<<"$signed")"
+          [[ -n "$signature" && -n "$length" ]] ||
+            { echo "::error::Could not parse sign_update output: $signed"; exit 1; }
+
+          minimum_system_version="$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" \
+            "$EXPORT_PATH/Auster.app/Contents/Info.plist")"
+
+          Scripts/release/append-appcast-item.sh \
+            --appcast .sparkle/appcast.xml \
+            --version "$version" \
+            --build "${{ steps.version.outputs.build }}" \
+            --url "https://github.com/${{ github.repository }}/releases/download/v$version/${{ steps.version.outputs.dmg }}" \
+            --signature "$signature" \
+            --length "$length" \
+            --notes "$NOTES_HTML" \
+            --pub-date "$(date -u '+%a, %d %b %Y %H:%M:%S +0000')" \
+            --minimum-system-version "$minimum_system_version"
+
+          # Record what was just released, so local builds report the shipped
+          # version and the next run has a marketing version to bump from.
+          Scripts/release/project-version.sh write "$CONFIG" \
+            "$version" "${{ steps.version.outputs.build }}"
+
+          # Archive the notes under the version they shipped as, and leave a
+          # fresh template ready for the next release.
+          git mv .sparkle/notes/next.md ".sparkle/notes/$version.md"
+          cp .sparkle/notes/TEMPLATE.md .sparkle/notes/next.md
+
+          git add .sparkle/appcast.xml "$CONFIG" .sparkle/notes
+          git commit -m "chore: release $version (${{ steps.version.outputs.build }}) [skip ci]"
+
+          # The release is already public by this point, so a rejected push would
+          # leave the feed permanently missing it. Rebase onto whatever landed on
+          # main during the run, and retry.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt), rebasing onto main"
+            git fetch origin main
+            git rebase origin/main
+          done
+
+          echo "::error::Could not push the appcast update after 3 attempts. The release is published but nobody will be offered it until .sparkle/appcast.xml is updated on main."
+          exit 1
