@@ -561,3 +561,48 @@ private final class Reporter: @unchecked Sendable {
         lock.withLock { values.last }
     }
 }
+
+// MARK: - Listing a folder that is not there
+
+/// Found by the Phase 9 integration suite running against the real API for the
+/// first time: the mock answered a listing of a folder that does not exist with
+/// an empty page, where Dropbox answers `path/not_found`. A folder that has been
+/// deleted remotely and one that is merely empty are not the same thing, and an
+/// engine tested only against the lenient answer never meets the strict one.
+@Suite("MockDropboxService listing errors")
+struct MockDropboxServiceListingTests {
+
+    @Test("listing a folder that does not exist throws notFound")
+    func listingMissingFolderThrows() async throws {
+        let service = MockDropboxService()
+        await #expect(throws: DropboxServiceError.notFound(path: "/nope")) {
+            try await service.listFolder(path: "/nope", recursive: true)
+        }
+    }
+
+    @Test("listing the root of an empty Dropbox is still fine")
+    func listingEmptyRootSucceeds() async throws {
+        let service = MockDropboxService()
+        let page = try await service.listFolder(path: "", recursive: true)
+        #expect(page.entries.isEmpty)
+    }
+
+    @Test("listing a folder that exists but is empty returns an empty page")
+    func listingEmptyFolderSucceeds() async throws {
+        let service = MockDropboxService()
+        service.seedFolder(at: "/empty")
+        let page = try await service.listFolder(path: "/empty", recursive: true)
+        #expect(page.entries.isEmpty)
+    }
+
+    @Test("listing a path that holds a file, not a folder, throws")
+    func listingAFileThrows() async throws {
+        let service = MockDropboxService()
+        try service.seedFile(at: "/a.txt", contents: "a")
+        // Dropbox says `path/not_folder` here, which the mapper turns into a
+        // conflict rather than a not-found.
+        await #expect(throws: DropboxServiceError.conflict(path: "/a.txt")) {
+            try await service.listFolder(path: "/a.txt", recursive: false)
+        }
+    }
+}
