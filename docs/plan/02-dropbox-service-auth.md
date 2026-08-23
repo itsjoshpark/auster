@@ -176,5 +176,5 @@ public enum LinkOutcome: Equatable { case linked(AccountInfo), cancelled, teamAc
   Auster does not support Dropbox team accounts.").
 - [x] Temporary debug UI in the MenuBarExtra window: Link/Unlink button + linked
   account email label (replaced in Phase 8).
-- [ ] TDD outcome logic with mock service (team rejection, cancel). Manual check
+- [x] TDD outcome logic with mock service (team rejection, cancel). Manual check
   with Josh's key: link → email appears; unlink → back to link button. Commit.
