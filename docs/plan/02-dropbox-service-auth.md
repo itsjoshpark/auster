@@ -168,13 +168,13 @@ tests `Tests/.../AuthManagerTests.swift`.
 public enum LinkOutcome: Equatable { case linked(AccountInfo), cancelled, teamAccountNotSupported, failed(String) }
 ```
 
-- [ ] App: `DropboxClientsManager.setupWithAppKeyDesktop(AppKey.value)` at launch
+- [x] App: `DropboxClientsManager.setupWithAppKeyDesktop(AppKey.value)` at launch
   (`AppKey` reads Info.plist value injected from xcconfig; fatal, user-visible
   alert if placeholder). `.onOpenURL` → `handleRedirect`.
-- [ ] `handleRedirect`: on success fetch `currentAccount()`; if `isTeam` →
+- [x] `handleRedirect`: on success fetch `currentAccount()`; if `isTeam` →
   `unlink()` and return `.teamAccountNotSupported` (UI copy: "**Not supported**:
   Auster does not support Dropbox team accounts.").
-- [ ] Temporary debug UI in the MenuBarExtra window: Link/Unlink button + linked
+- [x] Temporary debug UI in the MenuBarExtra window: Link/Unlink button + linked
   account email label (replaced in Phase 8).
 - [ ] TDD outcome logic with mock service (team rejection, cancel). Manual check
   with Josh's key: link → email appears; unlink → back to link button. Commit.

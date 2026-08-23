@@ -27,6 +27,11 @@
 	<key>LSUIElement</key>
 	<true/>
 
+	<!-- The Dropbox app key, injected from Config/Secrets.xcconfig. Read back
+	     at runtime by Auster/Support/AppKey.swift. -->
+	<key>DropboxAppKey</key>
+	<string>$(DROPBOX_APP_KEY)</string>
+
 	<!-- OAuth redirect target. Dropbox requires the scheme to be the app key
 	     prefixed with "db-"; the key is injected from Config/Secrets.xcconfig. -->
 	<key>CFBundleURLTypes</key>
