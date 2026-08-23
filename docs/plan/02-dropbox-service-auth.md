@@ -138,7 +138,7 @@ public enum ContentHasher {
   + jitter; honors `.rateLimited(retryAfter:)` and longpoll `backoff`; max 10
   attempts for `.dataCorrupted`/`.tooManyWriteOperations`, no retry for
   `.notFound`/`.notAuthorized`/etc. TDD with a fake clock.
-- [ ] `LiveDropboxService` wraps `DropboxClient` (injected), converting callbacks
+- [x] `LiveDropboxService` wraps `DropboxClient` (injected), converting callbacks
   to async via continuations and `CallError` → `DropboxServiceError` (mapping per
   api-notes §5). Upload implements the 4 MiB single-call/session split with
   mid-upload change detection (stat before/after read → throw
@@ -146,9 +146,9 @@ public enum ContentHasher {
   `ContentHasher.Streaming` on the fly; on final mismatch with metadata's
   `contentHash`, delete the partial file and throw `.dataCorrupted` (the retry
   layer re-attempts up to 10×).
-- [ ] Error-mapping unit tests (construct SDK error values → assert mapped enum).
+- [x] Error-mapping unit tests (construct SDK error values → assert mapped enum).
   Live network calls are NOT unit-tested; covered by Phase 9 integration suite.
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 2.4: Auth manager + app wiring
 
