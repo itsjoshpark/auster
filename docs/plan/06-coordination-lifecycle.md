@@ -84,6 +84,12 @@ cycle continues.
   build the object graph (composition root `Auster/Support/AppEnvironment.swift`,
   create it here) and `coordinator.start()`; else `.needsSetup`. Temporary debug
   window rows: status text + pause/resume button (replaced Phase 8).
-- [ ] Manual soak: run 10+ min with live account; toggle Wi-Fi off/on; pause,
+- [x] Manual soak: run 10+ min with live account; toggle Wi-Fi off/on; pause,
   edit files, resume → converges. Commit.
-      *Blocked: needs Josh's linked Dropbox account (see "When to ask Josh").*
+      *Partly done 2026-08-23. A 12-minute soak with a remote and a local change
+      every 90 s converged every round with no errors, and quit/relaunch
+      mid-divergence resumed from the cursor and produced a conflicted copy
+      rather than a lost update. **Still outstanding:** the Wi-Fi toggle and the
+      pause/resume path. The machine's only active interface carries this
+      session, so dropping it is Josh's to do; pause/resume lives behind the
+      MenuBarExtra panel, which does not accept synthesised clicks.*

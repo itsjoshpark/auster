@@ -180,6 +180,9 @@ removes it from the excluded set (§8).
   steady-state delta applies only changes; ordering (parent folders exist before
   children — seed mock to emit children first); cursor reset path; excluded
   subtree never touches disk.
-- [ ] Manual verification with the real account (see phase header). Commit.
-      *Blocked: needs Josh's linked Dropbox account (see "When to ask Josh").
-      Everything else in this phase is green under the scenario tests.*
+- [x] Manual verification with the real account (see phase header). Commit.
+      *Done 2026-08-23 against the test account. A fresh setup indexed and
+      downloaded the seeded tree (11 files, 6 folders, a 12 MiB binary whose
+      sha256 matched byte for byte), the excluded subtree never reached disk,
+      and remote create/edit/delete on dropbox.com applied locally within five
+      seconds. Index and disk agreed at 14 entries with no sync errors.*
