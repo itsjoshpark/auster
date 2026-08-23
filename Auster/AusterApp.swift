@@ -14,7 +14,7 @@ struct AusterApp: App {
 
     var body: some Scene {
         MenuBarExtra("Auster", systemImage: "checkmark.circle") {
-            MenuBarContentView(link: appDelegate.link)
+            MenuBarContentView(environment: appDelegate.environment)
         }
         .menuBarExtraStyle(.window)
 
@@ -33,7 +33,9 @@ struct AusterApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
-    let link = LinkController.fromBundle()
+    let environment = AppEnvironment(link: LinkController.fromBundle())
+
+    private var link: LinkController { environment.link }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard link.auth != nil else {
@@ -49,10 +51,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        Task { await link.restore() }
+        Task { await environment.start() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        Task { await link.handle(urls) }
+        Task {
+            await link.handle(urls)
+            // A successful link is the moment there is something to coordinate.
+            if link.isLinked, environment.coordinator == nil {
+                await environment.start()
+            }
+        }
+    }
+
+    /// Sync state is persisted incrementally — cursors and index rows are
+    /// written as each change lands — so quitting only has to stop the loops
+    /// (ux §9).
+    func applicationWillTerminate(_ notification: Notification) {
+        let environment = environment
+        Task { await environment.stopForQuit() }
     }
 }

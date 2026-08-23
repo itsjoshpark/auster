@@ -80,9 +80,10 @@ cycle continues.
   when service healed; pause cancels loops and persists; resume replays startup;
   quit is clean (no orphan tasks — assert via task handles); rebuildIndex clears
   cursor + index then reconverges; fatal folder-missing surfaces and loops stop.
-- [ ] Wire into app: on launch, if `AuthManager.isLinked` and folder configured →
+- [x] Wire into app: on launch, if `AuthManager.isLinked` and folder configured →
   build the object graph (composition root `Auster/Support/AppEnvironment.swift`,
   create it here) and `coordinator.start()`; else `.needsSetup`. Temporary debug
   window rows: status text + pause/resume button (replaced Phase 8).
 - [ ] Manual soak: run 10+ min with live account; toggle Wi-Fi off/on; pause,
   edit files, resume → converges. Commit.
+      *Blocked: needs Josh's linked Dropbox account (see "When to ask Josh").*

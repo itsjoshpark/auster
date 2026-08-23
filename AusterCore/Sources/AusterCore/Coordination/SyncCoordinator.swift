@@ -281,9 +281,7 @@ public actor SyncCoordinator {
     /// N10: the database is the source of truth, the config is the UI's mirror).
     public func setExcluded(items: Set<String>) async {
         let normalized = Set(items.map(PathStore.normalize))
-        if let encoded = try? JSONEncoder().encode(normalized.sorted()) {
-            try? database.setState(.excludedItems, String(decoding: encoded, as: UTF8.self))
-        }
+        try? database.setExcludedItems(normalized)
         await MainActor.run { config.excludedItems = normalized }
     }
 
