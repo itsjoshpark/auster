@@ -53,7 +53,7 @@ placeholder `Text("Auster")`, and an empty `Settings` scene.
 (replace the placeholder "Building" section with real instructions: scripts,
 where the app key goes).
 
-- [ ] `test.sh` runs `swift test --package-path AusterCore` then
+- [x] `test.sh` runs `swift test --package-path AusterCore` then
   `xcodebuild -project Auster.xcodeproj -scheme Auster build`. Both scripts pass.
   Commit.
 

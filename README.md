@@ -7,9 +7,8 @@ An open-source Dropbox sync client for macOS: a plain local folder (default
 menu bar icon. No Electron, no daemons, no on-demand placeholder files — just
 your files, on disk, synced.
 
-**Status: planning / pre-implementation.** The full design and implementation
-plan live in [`docs/`](docs/); implementation starts from
-[`docs/PLAN.md`](docs/PLAN.md).
+**Status: in development.** The full design and implementation plan live in
+[`docs/`](docs/), starting from [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Planned features (v1)
 
@@ -29,13 +28,45 @@ team/business accounts.
 - macOS 15 (Sequoia) or later
 - Xcode 26+ to build
 - A Dropbox API app key (development builds; see
-  `Config/Secrets.xcconfig.template` once scaffolding lands)
+  `Config/Secrets.xcconfig.template`)
 
 ## Building
 
-Build scripts arrive with Phase 1 of the implementation plan
-(`Scripts/build.sh`, `Scripts/test.sh`). Until then there is nothing to build —
-this repo is documentation.
+```sh
+git clone git@github.com:itsjoshpark/auster.git
+cd auster
+Scripts/test.sh          # AusterCore tests, then an app build
+Scripts/build.sh         # app build only (pass Release for a release build)
+```
+
+Both scripts are plain `xcodebuild`/`swift` wrappers — you can also just open
+`Auster.xcodeproj` in Xcode and hit Run. Swift package dependencies resolve on
+the first build.
+
+### The Dropbox app key
+
+Auster talks to Dropbox through an API app key. Builds succeed without one; it
+is only needed at runtime, to link an account.
+
+```sh
+cp Config/Secrets.xcconfig.template Config/Secrets.xcconfig
+# then edit Config/Secrets.xcconfig and set DROPBOX_APP_KEY
+```
+
+`Config/Secrets.xcconfig` is gitignored. `Config/Shared.xcconfig` picks it up
+via `#include?`, and the key becomes the app's OAuth redirect URL scheme
+(`db-<key>`). There is no client secret: OAuth uses PKCE.
+
+### Layout
+
+| Path | What |
+|---|---|
+| `AusterCore/` | The engine, as a local Swift package. No AppKit or SwiftUI. |
+| `Auster/` | The app: menu bar, settings, onboarding. No sync logic. |
+| `Config/` | Shared build settings and the secrets template. |
+| `Scripts/` | Build and test entry points. |
+| `docs/` | Design, decisions, research, and the phased implementation plan. |
+| `design/` | Reference artwork and its generators. Never referenced by the build. |
 
 ## Tech
 
