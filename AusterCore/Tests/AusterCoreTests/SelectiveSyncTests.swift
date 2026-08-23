@@ -200,7 +200,7 @@ final class SelectiveSyncFixture {
     }
 
     deinit {
-        UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        removeTestDefaults(suiteName: suiteName)
         try? FileManager.default.removeItem(at: root)
     }
 

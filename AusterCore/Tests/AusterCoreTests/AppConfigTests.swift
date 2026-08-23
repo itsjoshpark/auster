@@ -14,7 +14,7 @@ struct AppConfigTests {
     private func withConfig<T>(_ body: (AppConfig, UserDefaults) throws -> T) throws -> T {
         let suiteName = "auster-config-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defer { removeTestDefaults(suiteName: suiteName) }
 
         return try body(AppConfig(defaults: defaults), defaults)
     }
