@@ -1,8 +1,11 @@
 # Auster Menu Bar Icons
 
-Monochrome **template** icons for the `MenuBarExtra` status item: a simplified
-two-gust wind mark (same drafted-primitive construction as the app icon), with
-state conveyed by a badge in a knocked-out circle at bottom-right.
+Monochrome **template** icons for the `MenuBarExtra` status item: the **same
+three-gust wind glyph as the app icon** (identical construction and
+proportions, optically adjusted for 18 pt — slightly thicker strokes and wider
+line spacing), with state conveyed by a badge in a knocked-out circle at
+bottom-right. In badge states the middle gust drops its curl so the badge gets
+clean space; idle shows the full glyph.
 
 | File | State | Badge |
 |---|---|---|

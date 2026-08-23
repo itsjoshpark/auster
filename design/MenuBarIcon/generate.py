@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Generate Auster menu bar template icons (monochrome, alpha-only).
 
-A simplified two-gust wind mark on a 36x36 viewBox (drawn for 18x18 pt; ship
-as template PDF/SVG assets so AppKit tints them for menu bar light/dark).
+The same three-gust wind glyph as the app icon (identical construction and
+proportions, scaled to a 36x36 viewBox for 18x18 pt display), with two optical
+adjustments for menu bar size: proportionally thicker strokes and slightly
+wider line spacing so gusts stay separated on non-retina displays. Ship as
+template assets so AppKit tints them for menu bar light/dark.
 State variants carve a knockout circle bottom-right and draw a badge in it:
 
   idle     — plain mark
@@ -69,10 +72,19 @@ def arc_stroke(c, R, a0_deg, a1_deg, h, steps=60):
         pts.append((c[0] + R * math.cos(a), c[1] + R * math.sin(a)))
     return outline(pts, h)
 
-# The two-gust mark: curl on the top gust; bottom gust is a plain run that
-# stops short of the bottom-right badge corner.
-GUST_TOP = outline(centerline(13.5, 4.0, 22.0, curl=(6.2, 252, "up")))
-GUST_BOT = outline(centerline(24.5, 4.0, 26.0, curl=None))
+# The app icon's three-gust composition (see ../AppIcon/generate.py), scaled
+# by 36/1024 with optical tweaks: stroke width 3.4 (vs 2.67 true-scale) and
+# vertical rhythm 5.6 (vs 4.92 true-scale).
+S = 36.0 / 1024.0
+CY = 17.0          # optical center height of the middle gust
+RHYTHM = 5.6
+GUST_TOP = outline(centerline(CY - RHYTHM, 260 * S, 630 * S, curl=(88 * S, 252, "up")), h=1.7)
+GUST_BOT = outline(centerline(CY + RHYTHM, 260 * S, 494 * S, curl=None), h=1.7)
+# Idle carries the full app-icon glyph. Badge states drop the middle gust's
+# curl (the knockout would amputate it into an orphaned fragment); its plain
+# run gets a clean cut at the knockout edge instead.
+GUSTS_FULL = [GUST_TOP, outline(centerline(CY, 210 * S, 710 * S, curl=(100 * S, 252, "down")), h=1.7), GUST_BOT]
+GUSTS_BADGED = [GUST_TOP, outline(centerline(CY, 210 * S, 710 * S, curl=None), h=1.7), GUST_BOT]
 
 def svg(body, mask_badge=False):
     mask = ""
@@ -81,9 +93,10 @@ def svg(body, mask_badge=False):
         mask = (f'<mask id="knockout"><rect width="{VB}" height="{VB}" fill="white"/>'
                 f'<circle cx="{BADGE_C[0]}" cy="{BADGE_C[1]}" r="{BADGE_R}" fill="black"/></mask>')
         use_mask = ' mask="url(#knockout)"'
+    gusts = GUSTS_BADGED if mask_badge else GUSTS_FULL
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{VB:.0f}" height="{VB:.0f}" '
             f'viewBox="0 0 {VB:.0f} {VB:.0f}">\n<defs>{mask}</defs>\n'
-            f'<g fill="#000000"{use_mask}><path d="{GUST_TOP}"/><path d="{GUST_BOT}"/></g>\n'
+            f'<g fill="#000000"{use_mask}>' + "".join(f'<path d="{d}"/>' for d in gusts) + '</g>\n'
             f'{body}</svg>\n')
 
 cx, cy, r = *BADGE_C, BADGE_r
