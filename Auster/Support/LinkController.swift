@@ -36,6 +36,9 @@ final class LinkController {
 
     var isLinked: Bool { auth?.isLinked ?? false }
 
+    /// The Dropbox client for the linked account, or `nil` when there is none.
+    var service: (any DropboxService)? { auth?.service }
+
     var accountDescription: String? {
         guard let account = auth?.account else { return nil }
         return account.email

@@ -351,6 +351,31 @@ public final class SyncDatabase: Sendable {
         }
     }
 
+    // MARK: - Selective sync
+
+    /// The user's excluded paths, normalized (engine-doc §8).
+    ///
+    /// The database is the source of truth for the selection; `AppConfig` keeps
+    /// a mirror for the UI (implementation note N10). Stored as a JSON array
+    /// because the alternative — a table — would buy nothing for a list that is
+    /// read whole and written whole.
+    public func excludedItems() throws -> Set<String> {
+        guard let raw = try stateString(.excludedItems),
+            let decoded = try? JSONDecoder().decode([String].self, from: Data(raw.utf8))
+        else {
+            // A hand-edited or truncated value means "nothing excluded", which
+            // syncs more than intended rather than less — the recoverable way
+            // round.
+            return []
+        }
+        return Set(decoded)
+    }
+
+    public func setExcludedItems(_ items: Set<String>) throws {
+        let encoded = try JSONEncoder().encode(items.sorted())
+        try setState(.excludedItems, String(decoding: encoded, as: UTF8.self))
+    }
+
     // MARK: - Pending downloads
 
     /// Paths newly included by selective sync that still need fetching

@@ -415,19 +415,12 @@ public actor SyncEngine {
     /// The database is the source of truth for the selection (implementation
     /// note N10); the UI's mirror is Phase 7's to keep in step.
     private func retractExclusions(under retracted: Set<String>) throws {
-        guard let raw = try database.stateString(.excludedItems),
-            let stored = try? JSONDecoder().decode([String].self, from: Data(raw.utf8))
-        else {
-            return
-        }
-
+        let stored = try database.excludedItems()
         let remaining = stored.filter { entry in
             !retracted.contains { entry == $0 || entry.hasPrefix($0 + "/") }
         }
         guard remaining.count != stored.count else { return }
-
-        let encoded = try JSONEncoder().encode(remaining.sorted())
-        try database.setState(.excludedItems, String(decoding: encoded, as: UTF8.self))
+        try database.setExcludedItems(remaining)
     }
 
     // MARK: - Single items (§4)

@@ -12,7 +12,20 @@ struct AppShellTests {
     @MainActor
     @Test("Menu bar placeholder builds")
     func menuBarContentViewBuilds() {
-        _ = MenuBarContentView(link: LinkController(auth: nil))
+        _ = MenuBarContentView(environment: AppEnvironment(link: LinkController(auth: nil)))
+    }
+
+    /// Without an account there is nothing to coordinate, and the interface says
+    /// so rather than showing an empty sync UI.
+    @MainActor
+    @Test("An environment with no account needs setting up")
+    func unlinkedEnvironmentNeedsSetup() async {
+        let environment = AppEnvironment(link: LinkController(auth: nil))
+
+        await environment.start()
+
+        #expect(environment.state.status == .needsSetup)
+        #expect(environment.coordinator == nil)
     }
 
     @Test("a build without a real app key is treated as having none")

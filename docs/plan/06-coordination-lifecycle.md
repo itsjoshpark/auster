@@ -32,7 +32,7 @@ tests `Tests/.../SyncStateTests.swift`.
 public struct ActivityItem: Identifiable, Sendable, Equatable { public var id: String /* dbxPathLower */; public var dbxPath: String; public var direction: SyncDirection; public var completed: Int64; public var total: Int64 }
 ```
 
-- [ ] TDD state mutation helpers (activity add/update/remove, status precedence:
+- [x] TDD state mutation helpers (activity add/update/remove, status precedence:
   fatalError > paused > syncing > connecting > idle). Commit.
 
 ### Task 6.2: SyncCoordinator
@@ -74,15 +74,16 @@ Error funnel per engine-doc §2: connection → auto-pause+auto-resume; fatal �
 `state.status = .fatalError`, notify, stop loops; item errors → DB + state list,
 cycle continues.
 
-- [ ] TDD with mock service + temp dirs (fake longpoll returning scripted
+- [x] TDD with mock service + temp dirs (fake longpoll returning scripted
   sequences): startup order (recording mock asserts call order); longpoll
   changes triggers download; connection error flips to connecting and recovers
   when service healed; pause cancels loops and persists; resume replays startup;
   quit is clean (no orphan tasks — assert via task handles); rebuildIndex clears
   cursor + index then reconverges; fatal folder-missing surfaces and loops stop.
-- [ ] Wire into app: on launch, if `AuthManager.isLinked` and folder configured →
+- [x] Wire into app: on launch, if `AuthManager.isLinked` and folder configured →
   build the object graph (composition root `Auster/Support/AppEnvironment.swift`,
   create it here) and `coordinator.start()`; else `.needsSetup`. Temporary debug
   window rows: status text + pause/resume button (replaced Phase 8).
 - [ ] Manual soak: run 10+ min with live account; toggle Wi-Fi off/on; pause,
   edit files, resume → converges. Commit.
+      *Blocked: needs Josh's linked Dropbox account (see "When to ask Josh").*

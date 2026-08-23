@@ -278,3 +278,42 @@ mode and the revision guard *are* the safety argument for the upload direction
 — is the correctness argument for a batch (§5.5); neither is observable from the
 resulting remote state alone. `reversesListingOrder` exists for the same reason
 on the download side.
+
+### N21. `SyncState` tracks "is linked" separately from the fetched account (Phase 6)
+The phase file's `SyncState` has `account: AccountInfo?` and a `.needsSetup`
+status, which invites treating a missing account as "not linked". It is not: the
+profile can only be fetched online, so a linked user opening their laptop on a
+train would have been sent back through the setup wizard. `setLinked(_:)` is the
+input `.needsSetup` derives from — it comes from the keychain, which works
+offline — and `setAccount(_:)` only supplies the profile for display.
+
+### N22. `SyncEventCollector` breaks the engine/coordinator construction cycle (Phase 6)
+Notifications are batched per download cycle (engine-doc §10), so something must
+accumulate completed items and hand them over when the cycle ends. The engine
+cannot: its callbacks are fire-and-forget and it does not own cycle boundaries
+relative to the user's attention. The coordinator can, but it is built *after*
+the engine, which needs its callbacks at init. `SyncEventCollector` is the shared
+box both sides hold, and `SyncCoordinator.engineEvents(state:monitor:database:
+pathStore:collector:)` is the static factory that ties the knot. Consequently
+`SyncCoordinator.init` takes `collector:` in addition to the phase file's list,
+plus optional `connection:` and `tuning:`.
+
+### N23. Loop timings are injectable, and every loop has a floor (Phase 6)
+`SyncCoordinator.Tuning` carries the longpoll timeout, the post-change settle,
+the upload debounce and the reconnect backoff, so tests do not wait out real
+ones. It also carries a `loopFloor` applied to every iteration: real longpolling
+blocks for a minute or more, but a mock — or a server answering instantly —
+would otherwise turn the loop into a spin.
+
+### N24. Selective-sync exclusions get real accessors on `SyncDatabase` (Phase 6)
+`excludedItems()` / `setExcludedItems(_:)` replace ad-hoc JSON decoding that had
+started to appear in two places. A malformed stored value reads as "nothing
+excluded", which syncs more than intended rather than less — the recoverable way
+round.
+
+### N25. `ConnectionMonitor` is an accelerator, not a source of truth (Phase 6)
+The coordinator learns it is offline from the engine's own `.connection`
+failures and recovers by retrying, so `NWPathMonitor` is not load-bearing; what
+it adds is knowing the moment Wi-Fi returns rather than at the end of the next
+backoff. It sits behind `ConnectionMonitoring` and is `nil` in tests, which is
+why none of the lifecycle tests depend on real network state.
