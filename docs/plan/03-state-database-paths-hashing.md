@@ -114,7 +114,7 @@ public struct CachedContentHasher: Sendable {                        // hash-cac
 }
 ```
 
-- [ ] TDD: second call with same mtime does not re-read (test via a file removed
+- [x] TDD: second call with same mtime does not re-read (test via a file removed
   after first hash → still returns cached); mtime change → recompute; returns
   `"folder"` for dirs, nil for missing. Commit.
 
