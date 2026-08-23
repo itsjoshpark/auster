@@ -64,7 +64,7 @@ correctness comes from the cleaning stage + rescans, not perfect flag decoding.
 recombine moves unless a side is excluded → prune children of moved/deleted
 dirs; use dictionaries/sets, target ≥20k events < 1 s).
 
-- [ ] TDD each §5.3 rule: created+deleted (temporary) → dropped + rescan
+- [x] TDD each §5.3 rule: created+deleted (temporary) → dropped + rescan
   requested; deleted+created → modified; type change → delete+create pair;
   n(created)>n(deleted) → single created; move with side-events → stays split;
   move to excluded path → split into delete (src) + nothing (dst excluded
