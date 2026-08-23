@@ -51,7 +51,7 @@ public final class SyncDatabase: Sendable {
         try migrator.migrate(pool)
         // A corrupt file can survive `open` and even a no-op migration, so force
         // one real read of a table we just guaranteed exists.
-        try pool.read { try IndexRecord.fetchCount($0) }
+        _ = try pool.read { try IndexRecord.fetchCount($0) }
         return pool
     }
 
@@ -200,5 +200,46 @@ public final class SyncDatabase: Sendable {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "%", with: "\\%")
             .replacingOccurrences(of: "_", with: "\\_")
+    }
+
+    // MARK: - Hash cache
+
+    /// The cached content hash for a file, or `nil` when there is none *or* the
+    /// file has been written since it was cached (engine-doc §1.2).
+    ///
+    /// The inode is the key rather than the path so a rename does not throw away
+    /// a perfectly good hash; the mtime is what makes the entry stale.
+    public func cachedHash(inode: UInt64, mtime: Date) throws -> String? {
+        try pool.read { db in
+            guard let record = try HashCacheRecord.fetchOne(db, key: Self.column(inode)) else {
+                return nil
+            }
+            guard record.mtime == mtime.timeIntervalSince1970 else { return nil }
+            return record.hashStr
+        }
+    }
+
+    /// Records a file's hash. A `nil` hash forgets the inode instead of caching
+    /// an absence — an unknown hash and "we know it has none" would otherwise be
+    /// indistinguishable on read.
+    public func storeHash(inode: UInt64, localPath: String, hash: String?, mtime: Date) throws {
+        try pool.write { db in
+            guard let hash else {
+                _ = try HashCacheRecord.deleteOne(db, key: Self.column(inode))
+                return
+            }
+            try HashCacheRecord(
+                inode: Self.column(inode),
+                localPath: localPath,
+                hashStr: hash,
+                mtime: mtime.timeIntervalSince1970
+            ).save(db)
+        }
+    }
+
+    /// SQLite integers are signed, so inodes above `Int64.max` are stored by bit
+    /// pattern and read back the same way.
+    private static func column(_ inode: UInt64) -> Int64 {
+        Int64(bitPattern: inode)
     }
 }

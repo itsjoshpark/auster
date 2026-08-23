@@ -148,4 +148,78 @@ struct SyncDatabaseTests {
             try #expect(db.allIndexEntries().map(\.dbxPathLower).sorted() == ["/ab", "/b"])
         }
     }
+
+    // MARK: - Hash cache
+
+    @Test("A cached hash comes back for the same inode and mtime")
+    func hashCacheHit() throws {
+        try withDatabase { db, _ in
+            let mtime = Date(timeIntervalSince1970: 1_700_000_000)
+            try db.storeHash(inode: 42, localPath: "/tmp/a.txt", hash: "abc", mtime: mtime)
+
+            try #expect(db.cachedHash(inode: 42, mtime: mtime) == "abc")
+        }
+    }
+
+    @Test("A changed mtime invalidates the cached hash")
+    func hashCacheInvalidatedByMtime() throws {
+        try withDatabase { db, _ in
+            let mtime = Date(timeIntervalSince1970: 1_700_000_000)
+            try db.storeHash(inode: 42, localPath: "/tmp/a.txt", hash: "abc", mtime: mtime)
+
+            try #expect(db.cachedHash(inode: 42, mtime: mtime.addingTimeInterval(1)) == nil)
+        }
+    }
+
+    @Test("Sub-second mtime differences still invalidate the cached hash")
+    func hashCacheInvalidatedBySubSecondMtime() throws {
+        try withDatabase { db, _ in
+            let mtime = Date(timeIntervalSince1970: 1_700_000_000)
+            try db.storeHash(inode: 42, localPath: "/tmp/a.txt", hash: "abc", mtime: mtime)
+
+            try #expect(db.cachedHash(inode: 42, mtime: mtime.addingTimeInterval(0.01)) == nil)
+        }
+    }
+
+    @Test("An unknown inode has no cached hash")
+    func hashCacheMiss() throws {
+        try withDatabase { db, _ in
+            try #expect(db.cachedHash(inode: 7, mtime: Date()) == nil)
+        }
+    }
+
+    @Test("Storing a hash for a known inode replaces the previous entry")
+    func hashCacheReplaces() throws {
+        try withDatabase { db, _ in
+            let first = Date(timeIntervalSince1970: 1_700_000_000)
+            let second = first.addingTimeInterval(60)
+            try db.storeHash(inode: 42, localPath: "/tmp/a.txt", hash: "abc", mtime: first)
+            try db.storeHash(inode: 42, localPath: "/tmp/a.txt", hash: "def", mtime: second)
+
+            try #expect(db.cachedHash(inode: 42, mtime: first) == nil)
+            try #expect(db.cachedHash(inode: 42, mtime: second) == "def")
+        }
+    }
+
+    @Test("Storing a nil hash forgets the inode instead of caching nothing")
+    func hashCacheNilForgets() throws {
+        try withDatabase { db, _ in
+            let mtime = Date(timeIntervalSince1970: 1_700_000_000)
+            try db.storeHash(inode: 42, localPath: "/tmp/a.txt", hash: "abc", mtime: mtime)
+            try db.storeHash(inode: 42, localPath: "/tmp/a.txt", hash: nil, mtime: mtime)
+
+            try #expect(db.cachedHash(inode: 42, mtime: mtime) == nil)
+        }
+    }
+
+    @Test("Inodes above Int64.max survive the round trip")
+    func hashCacheLargeInode() throws {
+        try withDatabase { db, _ in
+            let mtime = Date(timeIntervalSince1970: 1_700_000_000)
+            let inode = UInt64.max - 1
+            try db.storeHash(inode: inode, localPath: "/tmp/a.txt", hash: "abc", mtime: mtime)
+
+            try #expect(db.cachedHash(inode: inode, mtime: mtime) == "abc")
+        }
+    }
 }
