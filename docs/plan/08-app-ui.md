@@ -15,7 +15,7 @@ doc.
 `Auster/MenuBar/StatusIcon.swift`, `Auster/MenuBar/RecentChangesSection.swift`;
 modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift`.
 
-- [ ] `StatusIcon.assetName(for: SyncState.Status, hasSyncErrors: Bool) -> String`
+- [x] `StatusIcon.assetName(for: SyncState.Status, hasSyncErrors: Bool) -> String`
   mapping per ux §1 onto the custom template icons from `design/MenuBarIcon/`
   (**copy** the five SVGs into `Assets.xcassets` as **template** image sets,
   rendered at 18×18 pt — `design/` is reference-only and never referenced by
@@ -24,7 +24,7 @@ modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift
   connecting → `menubar-offline`. TDD the mapping incl. the "error badge only
   when idle" rule (engine-doc §10 / cocoa behavior). Syncing stays static in
   v1 (see `design/MenuBarIcon/README.md`).
-- [ ] `MenuBarExtra` window content, top→bottom per ux §2: Open Dropbox Folder /
+- [x] `MenuBarExtra` window content, top→bottom per ux §2: Open Dropbox Folder /
   Launch Dropbox Website / divider / email + usage rows / divider / status row
   (+ inline activity progress rows when syncing, ≤ 5, from `state.activity`) /
   Sync Issues row ("No Sync Issues" disabled or "Show Sync Issues (N)…") /
@@ -34,7 +34,7 @@ modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift
   "snoozed until HH:MM" + turn-on when active) / Rebuild Index (confirmation
   dialog, copy per ux §2 item 13) / divider / Settings… / Check for Updates… /
   divider / Quit (⌘Q, calls `stopForQuit`).
-- [ ] Unlinked variant per ux §2. Commit.
+- [x] Unlinked variant per ux §2. Commit.
 
 ### Task 8.2: Onboarding wizard
 

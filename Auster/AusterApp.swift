@@ -5,21 +5,53 @@ import SwiftUI
 /// Auster's entry point.
 ///
 /// The app is a menu-bar-only agent (`LSUIElement`): a `MenuBarExtra` in window
-/// style plus a `Settings` scene. All sync logic lives in `AusterCore`; this
-/// target only renders state and forwards user intent.
+/// style, a `Settings` scene, and two ordinary windows for the things that do
+/// not fit in a menu. All sync logic lives in `AusterCore`; this target only
+/// renders state and forwards user intent.
 @main
 struct AusterApp: App {
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    private var environment: AppEnvironment { appDelegate.environment }
+
     var body: some Scene {
-        MenuBarExtra("Auster", systemImage: "checkmark.circle") {
-            MenuBarContentView(environment: appDelegate.environment)
+        MenuBarExtra {
+            MenuBarView(environment: environment)
+        } label: {
+            StatusIconLabel(environment: environment)
         }
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsPlaceholderView(environment: appDelegate.environment)
+            SettingsPlaceholderView(environment: environment)
+        }
+
+        Window("Sync Issues", id: SyncIssuesWindow.id) {
+            SyncIssuesWindow(environment: environment)
+        }
+        .defaultSize(width: 560, height: 360)
+    }
+}
+
+/// The menu bar's icon, as a view so that it tracks `SyncState`.
+///
+/// A `Scene`'s label is built once per update of the scene, and reading
+/// observable state from inside a view is what guarantees the icon changes when
+/// the status does.
+private struct StatusIconLabel: View {
+
+    @Bindable var environment: AppEnvironment
+
+    var body: some View {
+        let name = StatusIcon.assetName(
+            for: environment.state.status,
+            hasSyncErrors: !environment.state.syncErrors.isEmpty
+        )
+        if let image = StatusIcon.image(named: name) {
+            Image(nsImage: image)
+        } else {
+            Image(systemName: "circle.dashed")
         }
     }
 }

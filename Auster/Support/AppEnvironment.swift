@@ -1,3 +1,4 @@
+import AppKit
 import AusterCore
 import Foundation
 import Observation
@@ -11,24 +12,37 @@ import Observation
 /// break that cycle, and this is the one place the knot is tied.
 ///
 /// Everything here is app-target glue. `AusterCore` holds the logic; this holds
-/// the wiring and the lifetime.
+/// the wiring, the lifetime, and the handful of AppKit gestures — reveal in
+/// Finder, open a URL — that a menu item needs and `AusterCore` may not make.
 @MainActor
 @Observable
 final class AppEnvironment {
 
-    /// The only thing views read (design §2).
+    /// The only thing views read about sync (design §2).
     let state = SyncState()
 
+    /// The only thing views read about preferences.
+    let settings: AppSettings
+
     let link: LinkController
+
+    /// Sparkle arrives in Phase 10; until then this reports itself unavailable
+    /// and the update controls say so.
+    let updater = UpdaterController()
 
     /// `nil` until an account and a folder exist — there is nothing to
     /// coordinate before then.
     private(set) var coordinator: SyncCoordinator?
 
+    /// Set while a long, user-initiated operation is running, so the menu can
+    /// disable the controls that would start a second one.
+    private(set) var isBusy = false
+
     private var database: SyncDatabase?
 
-    init(link: LinkController) {
+    init(link: LinkController, settings: AppSettings = AppSettings()) {
         self.link = link
+        self.settings = settings
     }
 
     // MARK: - Lifecycle
@@ -37,7 +51,9 @@ final class AppEnvironment {
     func start() async {
         await link.restore()
 
-        guard link.isLinked else {
+        // Setup is not finished until there is both an account and somewhere to
+        // put its files (ux §3); either one missing sends the user to the wizard.
+        guard link.isLinked, settings.dropboxFolderURL != nil else {
             state.setLinked(false)
             return
         }
@@ -46,6 +62,12 @@ final class AppEnvironment {
         guard let coordinator = buildCoordinator() else { return }
         self.coordinator = coordinator
         await coordinator.start()
+    }
+
+    /// Ends onboarding: remembers the chosen folder and brings sync up.
+    func finishSetup(dropboxFolder: URL) async {
+        settings.dropboxFolderURL = dropboxFolder
+        await start()
     }
 
     func pause() async {
@@ -60,6 +82,33 @@ final class AppEnvironment {
         await coordinator?.stopForQuit()
     }
 
+    /// Throws the index away and derives it again from both sides (ux §2 item 13).
+    func rebuildIndex() async {
+        isBusy = true
+        defer { isBusy = false }
+        await coordinator?.rebuildIndex()
+    }
+
+    /// Unlinks and tears the graph down, returning the app to setup.
+    ///
+    /// The user's files are deliberately left alone: unlinking stops syncing
+    /// them, it does not disown them (ux §4). Everything Auster derived — the
+    /// index, the cursors, the preferences — goes, so a later relink starts from
+    /// a clean sheet rather than from state describing a different account.
+    func unlink() async {
+        await coordinator?.stopForQuit()
+        coordinator = nil
+        database = nil
+        await link.unlink()
+
+        if let directory = try? Self.applicationSupportDirectory() {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        settings.dropboxFolderURL = nil
+        state.setLinked(false)
+        state.setAccount(nil)
+    }
+
     // MARK: - Selective sync
 
     /// A folder tree seeded with the selection the engine is currently using.
@@ -69,30 +118,63 @@ final class AppEnvironment {
     /// opening the engine's tables.
     func makeFolderTreeModel() -> FolderTreeModel? {
         guard let service = link.service else { return nil }
-        return FolderTreeModel(service: service, excluded: AppConfig().excludedItems)
+        return FolderTreeModel(service: service, excluded: settings.config.excludedItems)
     }
 
     func setExcluded(_ items: Set<String>) async {
+        isBusy = true
+        defer { isBusy = false }
         await coordinator?.setExcluded(items: items)
     }
 
-    /// Unlinks and tears the graph down, returning the app to setup.
-    func unlink() async {
-        await coordinator?.stopForQuit()
-        coordinator = nil
-        database = nil
-        await link.unlink()
-        state.setLinked(false)
+    // MARK: - Gestures
+
+    /// The local Dropbox folder, chosen or defaulted.
+    var dropboxFolderURL: URL {
+        settings.dropboxFolderURL ?? Self.defaultDropboxFolder
     }
+
+    func openDropboxFolder() {
+        let url = dropboxFolderURL
+        // Creating it first, because a menu item that silently does nothing is
+        // worse than one that puts back a folder the user moved.
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(url)
+    }
+
+    func openDropboxWebsite() {
+        NSWorkspace.shared.open(URL(string: "https://www.dropbox.com/home")!)
+    }
+
+    /// Selects an item in Finder rather than opening it — the "Show" action of a
+    /// notification and of every recent-changes row (ux §7).
+    func revealInFinder(dbxPath: String) {
+        let relative = dbxPath.split(separator: "/", omittingEmptySubsequences: true)
+        let url = relative.reduce(dropboxFolderURL) {
+            $0.appendingPathComponent(String($1), isDirectory: false)
+        }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            NSWorkspace.shared.open(url.deletingLastPathComponent())
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    /// The dropbox.com page for a path, for items that are no longer on disk.
+    func openOnDropboxWebsite(dbxPath: String) {
+        let escaped =
+            dbxPath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? dbxPath
+        guard let url = URL(string: "https://www.dropbox.com/home" + escaped) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    static let deletedFilesURL = URL(string: "https://www.dropbox.com/deleted_files")!
 
     // MARK: - Assembly
 
     private func buildCoordinator() -> SyncCoordinator? {
-        let config = AppConfig()
-
-        // Phase 8's onboarding wizard chooses this; until then the default from
-        // decisions D3 is assumed so the engine can be exercised.
-        let dropbox = config.dropboxFolderURL ?? Self.defaultDropboxFolder
+        let config = settings.config
+        let dropbox = dropboxFolderURL
         guard let service = link.service else { return nil }
 
         do {
@@ -112,8 +194,8 @@ final class AppEnvironment {
                 pathStore: pathStore,
                 hasher: CachedContentHasher(database: database),
                 fileOps: fileOps,
-                // Read fresh on every use, so Phase 7 can change the selection
-                // while a cycle is running.
+                // Read fresh on every use, so the selective-sync tree can change
+                // the selection while a cycle is running.
                 excludedItems: { (try? database.excludedItems()) ?? [] },
                 events: SyncCoordinator.engineEvents(
                     state: state,
@@ -146,9 +228,9 @@ final class AppEnvironment {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Dropbox", isDirectory: false)
     }
 
-    /// The sync database, in Application Support rather than beside the user's
-    /// files — it is Auster's state, not theirs.
-    private static func databasePath() throws -> String {
+    /// Auster's own state, in Application Support rather than beside the user's
+    /// files — it is Auster's, not theirs.
+    private static func applicationSupportDirectory() throws -> URL {
         let directory = try FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
@@ -158,11 +240,16 @@ final class AppEnvironment {
         .appendingPathComponent("Auster", isDirectory: false)
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("sync.db", isDirectory: false).path
+        return directory
+    }
+
+    private static func databasePath() throws -> String {
+        try applicationSupportDirectory()
+            .appendingPathComponent("sync.db", isDirectory: false).path
     }
 }
 
-/// Stands in until Phase 8 wires up `UserNotifications`.
+/// Stands in until Task 8.4 wires up `UserNotifications`.
 ///
 /// Deliberately silent rather than logging: the notification *rules* of
 /// engine-doc §10 live in the real implementation, and a half-built version
