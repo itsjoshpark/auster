@@ -23,7 +23,7 @@ persistent pending-downloads queue; coordinator's drain task picks them up
 upload-side "(selective sync conflict)" rename already exist (Phases 4/5) and
 read the same set.
 
-- [ ] TDD: exclude removes local + index, set persisted lowercased/minimal;
+- [x] TDD: exclude removes local + index, set persisted lowercased/minimal;
   include triggers queued download (assert via pending queue + drained mock);
   nested exclude/include set algebra; scenario: exclude → remote edits under it
   ignored → include → full subtree restored converged; restart mid-include

@@ -456,6 +456,35 @@ public actor SyncEngine {
         try await applyPage(entries, with: applier, indexing: false)
     }
 
+    // MARK: - Selective sync (§8)
+
+    /// Takes a newly excluded subtree out of the local folder and the index.
+    ///
+    /// Runs on the engine rather than on the coordinator because it mutates the
+    /// same two things a sync cycle does, and the engine's isolation is what
+    /// stops the two from interleaving. The deletion is ignore-wrapped like
+    /// every other local mutation (decisions D9.2), so removing a folder the
+    /// user deselected is never mistaken for the user deleting it — which would
+    /// delete it on Dropbox too.
+    ///
+    /// Order matters: the disk first, the index second. An index pruned ahead of
+    /// a deletion that then fails would leave files the catch-up scan reads as
+    /// brand new and uploads straight back.
+    public func removeExcluded(dbxPathLower: String) async throws {
+        try fileOps.ensureRootPresent()
+
+        let pathLower = PathStore.normalize(dbxPathLower)
+        let cased = try database.indexEntry(forPathLower: pathLower)?.dbxPathCased ?? pathLower
+
+        // Not `requireExactCasing`: the path comes from the user's selection via
+        // the index, not from a remote event, so there is no casing to disagree
+        // with — and refusing the delete would leave the folder syncing.
+        try fileOps.deleteItem(at: pathStore.toLocalURL(dbxPathCased: cased), requireExactCasing: false)
+
+        try database.removeIndexSubtree(pathLower: pathLower)
+        try database.clearSyncErrors(pathLower: pathLower)
+    }
+
     // MARK: - Internals
 
     private func makeApplier() async throws -> DownloadApplier {
