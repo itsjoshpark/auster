@@ -83,6 +83,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Unlinking from Settings puts the app back where a first launch does.
+        environment.onNeedsSetup = { [weak self] in
+            guard let self else { return }
+            onboardingController.show(environment)
+        }
+
         Task {
             await environment.start()
             // The wizard is the app until it has been through: a menu-bar icon

@@ -42,6 +42,14 @@ final class AppEnvironment {
     /// disable the controls that would start a second one.
     private(set) var isBusy = false
 
+    /// Called when Auster no longer has what it needs to sync and the wizard has
+    /// to come back — which today means the user unlinked from Settings.
+    ///
+    /// A callback rather than a direct call because the wizard is an AppKit
+    /// window owned by the app delegate, and the environment has no business
+    /// knowing that.
+    var onNeedsSetup: (@MainActor () -> Void)?
+
     private var database: SyncDatabase?
 
     init(auth: AuthManager?, settings: AppSettings = AppSettings()) {
@@ -198,6 +206,7 @@ final class AppEnvironment {
         settings.dropboxFolderURL = nil
         state.setLinked(false)
         state.setAccount(nil)
+        onNeedsSetup?()
     }
 
     // MARK: - Selective sync
