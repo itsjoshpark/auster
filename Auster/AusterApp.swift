@@ -69,7 +69,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let onboardingController = OnboardingWindowController()
 
+    /// Whether this process is hosting a test bundle rather than being run by
+    /// somebody.
+    ///
+    /// `AusterTests` uses `Auster.app` as its test host, so everything below
+    /// runs before a single test does. Two consequences, both bad: the
+    /// single-instance guard sees the developer's own running Auster and
+    /// terminates the host before the runner connects ("Early unexpected exit …
+    /// exited with code 0 before establishing connection"), and on a machine
+    /// where it *did* proceed, `environment.start()` would point the real engine
+    /// at the real Dropbox folder for the duration of a unit-test run.
+    private static var isRunningTests: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A test host launches the app to load a bundle into it, and wants none
+        // of what follows.
+        guard !Self.isRunningTests else { return }
+
         // One Auster at a time (ux §9). Two instances over one database and one
         // watched folder would each see the other's writes as the user's.
         if case .deferToExisting = SingleInstance.decision(
