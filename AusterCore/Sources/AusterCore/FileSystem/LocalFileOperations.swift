@@ -232,7 +232,14 @@ public struct LocalFileOperations: Sendable {
     ///
     /// - Throws: `SyncFatalError.dropboxFolderMissing`.
     public func ensureRootPresent() throws {
-        guard itemIsDirectory(at: root) == true, nameMatchesExactly(root) else {
+        try Self.ensurePresent(root: root)
+    }
+
+    /// The same guard, without needing an instance — the catch-up scan runs it
+    /// before it is allowed to emit a single deletion (engine-doc §6).
+    public static func ensurePresent(root: URL) throws {
+        let url = root.standardizedFileURL
+        guard isDirectory(at: url) == true, nameMatchesExactly(url) else {
             throw SyncFatalError.dropboxFolderMissing
         }
     }
@@ -242,6 +249,10 @@ public struct LocalFileOperations: Sendable {
     /// Whether the item at `url` is a directory, or `nil` when nothing is there.
     /// Symlinks are not followed — a link to a folder is still a link.
     private func itemIsDirectory(at url: URL) -> Bool? {
+        Self.isDirectory(at: url)
+    }
+
+    private static func isDirectory(at url: URL) -> Bool? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
             return nil
         }
@@ -255,6 +266,10 @@ public struct LocalFileOperations: Sendable {
     /// case-insensitive volume answers about a *different* file than the one
     /// being named.
     private func nameMatchesExactly(_ url: URL) -> Bool {
+        Self.nameMatchesExactly(url)
+    }
+
+    private static func nameMatchesExactly(_ url: URL) -> Bool {
         let name = url.lastPathComponent
         guard
             let siblings = try? FileManager.default.contentsOfDirectory(

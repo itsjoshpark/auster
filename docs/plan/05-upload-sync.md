@@ -117,10 +117,10 @@ localCursorTimestamp.
 — engine-doc §6 (mtime vs max(lastSync, localCursor); exact-casing existence for
 deletions; root-presence guard **before** emitting deletions).
 
-- [ ] TDD catch-up: untracked file → created; tracked newer-mtime → modified;
+- [x] TDD catch-up: untracked file → created; tracked newer-mtime → modified;
   tracked missing → deleted; casing-drift counts as missing; root missing →
   throws fatal (no deletion storm); type change → pair.
-- [ ] TDD cycle ordering with a recording mock (deletes before creates; parents
+- [x] TDD cycle ordering with a recording mock (deletes before creates; parents
   before children). Commit.
 
 ### Task 5.5: Two-way scenario suite (engine acceptance tests)

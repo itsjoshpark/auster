@@ -153,14 +153,23 @@ public actor SyncEngine {
             try Task.checkCancellation()
             try await applyOne(event, with: applier)
         }
-        try await applyInParallel(files, with: applier)
+        try await forEachConcurrently(files) { event in
+            try await self.applyOne(event, with: applier)
+        }
 
         return built.count
     }
 
-    /// Runs file transfers concurrently, bounded so a large page cannot open a
-    /// connection per file (engine-doc §7).
-    private func applyInParallel(_ events: [SyncItemEvent], with applier: DownloadApplier) async throws {
+    /// Runs transfers concurrently, bounded so a large batch cannot open a
+    /// connection per item (engine-doc §7).
+    ///
+    /// A hand-rolled window rather than adding every task up front: a page can
+    /// hold thousands of files, and starting them all would defeat the bound the
+    /// semaphore exists to impose.
+    private func forEachConcurrently(
+        _ events: [SyncItemEvent],
+        _ body: @escaping @Sendable (SyncItemEvent) async throws -> Void
+    ) async throws {
         guard !events.isEmpty else { return }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -170,7 +179,7 @@ public actor SyncEngine {
             for _ in 0..<inFlight {
                 let event = events[next]
                 next += 1
-                group.addTask { try await self.applyOne(event, with: applier) }
+                group.addTask { try await body(event) }
             }
 
             while try await group.next() != nil {
@@ -178,22 +187,35 @@ public actor SyncEngine {
                 try Task.checkCancellation()
                 let event = events[next]
                 next += 1
-                group.addTask { try await self.applyOne(event, with: applier) }
+                group.addTask { try await body(event) }
             }
         }
     }
 
-    /// Applies one event, turning anything that concerns only this path into a
-    /// recorded sync issue (design §5).
     private func applyOne(_ event: SyncItemEvent, with applier: DownloadApplier) async throws {
+        try await record(event) { try await applier.apply(event) }
+    }
+
+    private func applyOne(_ event: SyncItemEvent, with applier: UploadApplier) async throws {
+        try await record(event) { try await applier.apply(event) }
+    }
+
+    /// Runs one item's handler, turning anything that concerns only this path
+    /// into a recorded sync issue (design §5).
+    ///
+    /// The distinction is what keeps a cycle useful: a file Dropbox will not
+    /// name should not stop the other nine hundred, while a revoked token means
+    /// every one of them would fail the same way.
+    private func record(
+        _ event: SyncItemEvent,
+        _ handler: () async throws -> SyncCompletion
+    ) async throws {
         do {
-            let completion = try await applier.apply(event)
+            let completion = try await handler()
             try database.clearSyncErrors(pathLower: event.dbxPathLower)
             try recordHistory(for: event, completion: completion)
             events.itemCompleted(event, completion)
         } catch let error as DropboxServiceError {
-            // These are about the session, not the file, and every other path in
-            // the page would fail the same way.
             switch error {
             case .notAuthorized: throw SyncFatalError.notAuthorized
             case .connection, .cursorReset: throw error
@@ -203,7 +225,7 @@ public actor SyncEngine {
             let itemError = SyncItemError(
                 dbxPath: event.dbxPath,
                 dbxPathLower: event.dbxPathLower,
-                direction: .down,
+                direction: event.direction,
                 title: Self.failureTitle(for: event),
                 message: error.localizedDescription
             )
@@ -213,19 +235,22 @@ public actor SyncEngine {
     }
 
     private static func failureTitle(for event: SyncItemEvent) -> String {
-        switch event.changeType {
-        case .removed: "Could not delete item"
-        default: event.itemType == .folder ? "Could not create folder" : "Could not download file"
+        let noun = event.itemType == .folder ? "folder" : "file"
+        switch (event.direction, event.changeType) {
+        case (_, .removed): return "Could not delete item"
+        case (_, .moved): return "Could not move item"
+        case (.down, _): return "Could not download \(noun)"
+        case (.up, _): return "Could not upload \(noun)"
         }
     }
 
     private func recordHistory(for event: SyncItemEvent, completion: SyncCompletion) throws {
-        // Only real changes are worth showing: a skip means the user's folder
-        // already looked the way it looks now.
+        // Only real changes are worth showing: a skip means the folder already
+        // looked the way it looks now.
         guard completion == .done || completion == .conflictedCopy else { return }
         try database.appendHistory(
             HistoryEntry(
-                direction: .down,
+                direction: event.direction,
                 changeType: event.changeType,
                 itemType: event.itemType ?? .file,
                 dbxPath: event.dbxPath,
@@ -233,6 +258,131 @@ public actor SyncEngine {
                 timestamp: event.changeTime ?? Date()
             )
         )
+    }
+
+    // MARK: - Upload cycle (§5.4, §5.5)
+
+    /// Sends one batch of local changes to Dropbox.
+    ///
+    /// The batch arrives raw from the watcher — or synthesised by the catch-up
+    /// scan, which is the same shape on purpose — and is cleaned into one intent
+    /// per path before anything is hashed or sent (§5.3).
+    ///
+    /// - Throws: `SyncFatalError` and connection failures. Per-path failures are
+    ///   recorded as sync issues.
+    public func uploadCycle(rawEvents: [RawFSEvent]) async throws {
+        guard !rawEvents.isEmpty else { return }
+        try fileOps.ensureRootPresent()
+
+        let excluded = excludedItems()
+        let cleaned = LocalEventCleaner.clean(
+            rawEvents,
+            // Only for deciding whether a rename may be recombined into a move:
+            // a rename across the selective-sync boundary is a deletion on one
+            // side and nothing on the other, not a move (§5.3 rule 3).
+            isExcluded: { url in
+                guard let dbxPath = try? pathStore.toDbxPath(localURL: url) else { return false }
+                return Exclusions.isExcluded(byUser: PathStore.normalize(dbxPath), excluded: excluded)
+            },
+            requestRescan: { events.rescanRequested($0) }
+        )
+        guard !cleaned.isEmpty else { return }
+
+        let built = try await convert(cleaned)
+        guard !built.isEmpty else { return }
+
+        events.statusText("Syncing…")
+        let applier = UploadApplier(
+            service: service,
+            database: database,
+            pathStore: pathStore,
+            hasher: hasher,
+            fileOps: fileOps,
+            events: events,
+            excludedItems: excludedItems
+        )
+        try await applyUploads(built, with: applier)
+
+        // Only now: this timestamp is the bar the next catch-up scan measures
+        // mtimes against, and moving it before the work is done would hide
+        // whatever the cycle failed to send (decisions D9.4).
+        try database.setState(.localCursorTimestamp, String(Date().timeIntervalSince1970))
+    }
+
+    /// Runs the offline catch-up scan and applies whatever it finds (§6).
+    public func catchUpScan() async throws {
+        let cursor = (try database.stateString(.localCursorTimestamp)).flatMap(Double.init)
+        let scanned = try CatchUpScanner.scan(
+            root: fileOps.root,
+            database: database,
+            pathStore: pathStore,
+            localCursor: cursor.map { Date(timeIntervalSince1970: $0) }
+        )
+        try await uploadCycle(rawEvents: scanned)
+    }
+
+    /// Turns cleaned filesystem events into sync events, hashing in parallel.
+    ///
+    /// Hashing is the expensive part of the upload direction and it is pure
+    /// local work, so it happens for the whole batch up front rather than one
+    /// file at a time between network calls.
+    private func convert(_ cleaned: [RawFSEvent]) async throws -> [SyncItemEvent] {
+        let admitted = cleaned.filter { !Exclusions.isExcludedName($0.url.lastPathComponent) }
+        guard !admitted.isEmpty else { return [] }
+
+        let database = database
+        let pathStore = pathStore
+        let hasher = hasher
+
+        return try await withThrowingTaskGroup(of: (Int, SyncItemEvent?).self) { group in
+            for (offset, raw) in admitted.enumerated() {
+                group.addTask {
+                    // A file that vanished between the event and the hash is not
+                    // a cycle failure; the deletion event is already on its way.
+                    let event = try? SyncItemEvent(
+                        local: raw,
+                        index: database,
+                        pathStore: pathStore,
+                        hasher: hasher
+                    )
+                    return (offset, event)
+                }
+            }
+
+            var built = [SyncItemEvent?](repeating: nil, count: admitted.count)
+            for try await (offset, event) in group { built[offset] = event }
+            return built.compactMap(\.self)
+        }
+    }
+
+    /// Applies a batch in the order of §5.5.
+    ///
+    /// Dropbox offers no transaction, so the sequence of calls *is* the
+    /// correctness argument: deletions first because a creation may want the
+    /// name, directory moves next and one at a time because each takes a whole
+    /// subtree with it, then everything else shallowest-first so a parent always
+    /// exists before its children are sent.
+    private func applyUploads(_ built: [SyncItemEvent], with applier: UploadApplier) async throws {
+        let deletions = built.filter { $0.changeType == .removed }
+        let directoryMoves = built.filter { $0.changeType == .moved && $0.itemType == .folder }
+        let rest = built.filter { $0.changeType != .removed && !($0.changeType == .moved && $0.itemType == .folder) }
+
+        try await forEachConcurrently(deletions) { event in
+            try await self.applyOne(event, with: applier)
+        }
+
+        for event in directoryMoves.sorted(by: Self.shallowestFirst) {
+            try Task.checkCancellation()
+            try await applyOne(event, with: applier)
+        }
+
+        for depth in Set(rest.map { Self.depth(of: $0.dbxPathLower) }).sorted() {
+            try Task.checkCancellation()
+            let level = rest.filter { Self.depth(of: $0.dbxPathLower) == depth }
+            try await forEachConcurrently(level) { event in
+                try await self.applyOne(event, with: applier)
+            }
+        }
     }
 
     // MARK: - Filtering (§8)

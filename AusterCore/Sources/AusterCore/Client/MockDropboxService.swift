@@ -83,6 +83,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     private var uploads: [(path: String, mode: WriteMode, clientModified: Date)] = []
     private var deletes: [(path: String, parentRev: String?)] = []
     private var moves: [(from: String, to: String)] = []
+    private var folderCreations: [String] = []
     private var isAuthorized = true
 
     private var storedAccount = AccountInfo(
@@ -161,6 +162,12 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     /// Every move, source then destination.
     public var recordedMoves: [(from: String, to: String)] {
         lock.withLock { moves }
+    }
+
+    /// Every folder creation, in order — enough to assert that parents were
+    /// created before their children (engine-doc §5.5).
+    public var recordedFolderCreations: [String] {
+        lock.withLock { folderCreations }
     }
 
     /// Makes the next `times` calls to `call` throw `error`.
@@ -486,6 +493,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     public func createFolder(path: String, autorename: Bool) async throws -> RemoteFolder {
         try lock.withLock {
             try enter(.createFolder)
+            folderCreations.append(Self.normalized(path))
             var target = path
             if nodes[Self.key(for: path)] != nil {
                 guard autorename else { throw DropboxServiceError.conflict(path: path) }

@@ -145,24 +145,15 @@ public final class LocalFileMonitor: @unchecked Sendable {
         }
 
         continuation.yield(RawFSEvent(kind: .created, url: target, isDirectory: true))
-        guard
-            let walker = FileManager.default.enumerator(
-                at: target,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: []
-            )
-        else {
-            return
-        }
-        for case let child as URL in walker {
-            let isDirectory = (try? child.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            continuation.yield(
-                RawFSEvent(
-                    kind: .created,
-                    url: URL(fileURLWithPath: child.path, isDirectory: false),
-                    isDirectory: isDirectory
+
+        var pending = [target]
+        while let directory = pending.popLast() {
+            for child in DirectoryListing.children(of: directory) {
+                continuation.yield(
+                    RawFSEvent(kind: .created, url: child.url, isDirectory: child.isDirectory)
                 )
-            )
+                if child.isDirectory { pending.append(child.url) }
+            }
         }
     }
 
