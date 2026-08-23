@@ -41,6 +41,16 @@ struct AusterApp: App {
         .defaultSize(width: 560, height: 360)
         .defaultLaunchBehavior(.suppressed)
         .handlesExternalEvents(matching: [])
+
+        // The same two modifiers, for the same reason: any `Window` scene left
+        // eligible is one SwiftUI can present uninvited when the redirect
+        // arrives (note N41).
+        Window("Recent Changes", id: RecentChangesWindow.id) {
+            RecentChangesWindow(environment: environment)
+        }
+        .defaultSize(width: 560, height: 420)
+        .defaultLaunchBehavior(.suppressed)
+        .handlesExternalEvents(matching: [])
     }
 }
 

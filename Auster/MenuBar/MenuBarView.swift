@@ -88,10 +88,10 @@ struct MenuBarView: View {
             }
         }
 
-        RecentChangesSection(
-            changes: state.recentChanges,
-            reveal: { environment.revealInFinder(dbxPath: $0) }
-        )
+        MenuRowButton("Show Recent Changes…") {
+            openWindow(id: RecentChangesWindow.id)
+            NSApp.activate(ignoringOtherApps: true)
+        }
 
         Divider().padding(.vertical, 4)
 
@@ -126,14 +126,11 @@ struct MenuBarView: View {
             MenuInfoRow("Notifications snoozed until \(Self.time.string(from: until))")
             MenuRowButton("Turn On Notifications") { environment.settings.turnOnNotifications() }
         } else {
-            Menu("Snooze Notifications") {
+            MenuRowMenu("Snooze Notifications") {
                 Button("For the next 30 minutes") { environment.settings.snoozeNotifications(for: 30 * 60) }
                 Button("For the next hour") { environment.settings.snoozeNotifications(for: 3600) }
                 Button("For the next 8 hours") { environment.settings.snoozeNotifications(for: 8 * 3600) }
             }
-            .menuStyle(.borderlessButton)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
         }
     }
 
@@ -223,6 +220,51 @@ struct MenuRowButton: View {
             .foregroundStyle(isHovering && isEnabled ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
         }
         .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+    }
+}
+
+/// A submenu that looks like the rows around it (ux §2 item 12).
+///
+/// `Menu` on its own draws a bordered popup button, which reads as a control
+/// dropped into a menu rather than as a menu item with a submenu. The chrome is
+/// stripped and the label rebuilt to match `MenuRowButton`, down to the hover
+/// highlight and the trailing chevron; the submenu itself is left to the system,
+/// which is what makes it look standard.
+struct MenuRowMenu<Content: View>: View {
+
+    private let title: String
+    private let content: () -> Content
+
+    @State private var isHovering = false
+
+    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.content = content
+    }
+
+    var body: some View {
+        Menu {
+            content()
+        } label: {
+            HStack(spacing: 8) {
+                Text(title)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(isHovering ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .contentShape(.rect)
+            .background(
+                isHovering ? Color.accentColor.opacity(0.85) : .clear,
+                in: .rect(cornerRadius: 4)
+            )
+            .foregroundStyle(isHovering ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .onHover { isHovering = $0 }
     }
 }
