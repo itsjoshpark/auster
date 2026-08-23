@@ -145,8 +145,7 @@ public final class SyncDatabase: Sendable {
             guard let (sql, arguments) = Self.subtreeCondition(pathLower) else {
                 return try IndexRecord.fetchAll(db).compactMap(\.entry)
             }
-            return try IndexRecord
-                .filter(sql: sql, arguments: arguments)
+            return try IndexRecord.filter(sql: sql, arguments: arguments)
                 .fetchAll(db)
                 .compactMap(\.entry)
         }
@@ -271,8 +270,7 @@ public final class SyncDatabase: Sendable {
     /// retries the paths it is responsible for.
     public func clearSyncErrors(direction: SyncDirection) throws {
         try pool.write { db in
-            _ = try SyncErrorRecord
-                .filter(sql: "direction = ?", arguments: [direction.rawValue])
+            _ = try SyncErrorRecord.filter(sql: "direction = ?", arguments: [direction.rawValue])
                 .deleteAll(db)
         }
     }
@@ -312,9 +310,10 @@ public final class SyncDatabase: Sendable {
     /// visible, and a busy hour must not leave ten thousand.
     public func pruneHistory(olderThan cutoff: Date, keepAtMost limit: Int) throws {
         try pool.write { db in
-            _ = try HistoryRecord
-                .filter(sql: "timestamp < ?", arguments: [cutoff.timeIntervalSince1970])
-                .deleteAll(db)
+            _ = try HistoryRecord.filter(
+                sql: "timestamp < ?",
+                arguments: [cutoff.timeIntervalSince1970]
+            ).deleteAll(db)
 
             try db.execute(
                 sql: """
