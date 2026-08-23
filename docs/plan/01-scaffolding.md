@@ -13,14 +13,14 @@ the menu bar with a placeholder window.
 `AusterCore/Sources/AusterCore/AusterCore.swift` (placeholder type),
 `AusterCore/Tests/AusterCoreTests/SmokeTests.swift`.
 
-- [ ] Package manifest: swift-tools 6.0, platform `.macOS(.v15)`, library product
+- [x] Package manifest: swift-tools 6.0, platform `.macOS(.v15)`, library product
   `AusterCore`; dependencies `https://github.com/dropbox/SwiftyDropbox` (latest
   release major) and `https://github.com/groue/GRDB.swift` (latest release major).
   Enable strict concurrency (`SwiftSetting.enableUpcomingFeature` not needed on
   tools 6 — language mode 6 is the default).
-- [ ] Smoke test: `import AusterCore; import SwiftyDropbox; import GRDB` and assert
+- [x] Smoke test: `import AusterCore; import SwiftyDropbox; import GRDB` and assert
   a trivial fact, so dependency resolution is exercised by CI-style `swift test`.
-- [ ] `swift test` passes. Commit.
+- [x] `swift test` passes. Commit.
 
 ### Task 1.2: App target
 
