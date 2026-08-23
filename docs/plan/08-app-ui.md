@@ -53,6 +53,8 @@ tests `Tests/.../OnboardingModelTests.swift`.
   transitions incl. cancel-and-unlink from folder page.
 - [x] Fixed ~550×400 window shown when `.needsSetup`; closing it quits. Manual
   run-through fresh (delete app support + unlink first). Commit.
+      *The window and all five pages are done and committed; the fresh
+      run-through is outstanding — it needs Josh's Dropbox account.*
 
 ### Task 8.3: Settings window
 

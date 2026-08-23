@@ -140,4 +140,4 @@ index; every file's hash consistent).
   offline batch (catch-up) converges incl. deletes; move tree locally →
   single remote move (mock records ≤ 2 write calls); large file (12 MiB, mock
   asserts session path with 4 MiB chunks); excluded-name files never uploaded.
-- [ ] Commit.
+- [x] Commit.

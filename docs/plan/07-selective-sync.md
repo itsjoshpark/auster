@@ -62,3 +62,5 @@ tests `Tests/.../FolderTreeModelTests.swift`.
   spinner, Apply + Revert buttons calling
   `coordinator.setExcluded(items: model.resultingExcludedSet())`. Manual check
   against live account. Commit.
+      *The view and its model are done and committed; the manual check against a
+      live account is outstanding — it needs Josh's Dropbox account.*
