@@ -375,4 +375,142 @@ struct SyncDatabaseTests {
             try #expect(db.recentHistory(limit: 10).map(\.dbxPath) == ["/9.txt", "/8.txt", "/7.txt"])
         }
     }
+
+    // MARK: - State
+
+    @Test("A state value round trips")
+    func stateRoundTrip() throws {
+        try withDatabase { db, _ in
+            try db.setState(.remoteCursor, "cursor-1")
+
+            try #expect(db.stateString(.remoteCursor) == "cursor-1")
+        }
+    }
+
+    @Test("An unset key reads back as nil")
+    func stateUnsetKey() throws {
+        try withDatabase { db, _ in
+            try #expect(db.stateString(.didFinishIndexing) == nil)
+        }
+    }
+
+    @Test("Setting a key twice replaces the value")
+    func stateReplaces() throws {
+        try withDatabase { db, _ in
+            try db.setState(.indexingCounter, "1")
+            try db.setState(.indexingCounter, "2")
+
+            try #expect(db.stateString(.indexingCounter) == "2")
+        }
+    }
+
+    @Test("Setting nil clears the key rather than storing an empty string")
+    func stateNilClears() throws {
+        try withDatabase { db, _ in
+            try db.setState(.remoteCursor, "cursor-1")
+            try db.setState(.remoteCursor, nil)
+
+            try #expect(db.stateString(.remoteCursor) == nil)
+        }
+    }
+
+    @Test("State keys are independent of one another")
+    func stateKeysIndependent() throws {
+        try withDatabase { db, _ in
+            try db.setState(.remoteCursor, "cursor-1")
+            try db.setState(.localCursorTimestamp, "1700000000")
+
+            try #expect(db.stateString(.remoteCursor) == "cursor-1")
+            try #expect(db.stateString(.localCursorTimestamp) == "1700000000")
+        }
+    }
+
+    // MARK: - Pending downloads
+
+    @Test("Pending downloads round trip and de-duplicate")
+    func pendingDownloadsRoundTrip() throws {
+        try withDatabase { db, _ in
+            try db.addPendingDownload("/photos")
+            try db.addPendingDownload("/docs")
+            try db.addPendingDownload("/photos")
+
+            try #expect(db.pendingDownloads().sorted() == ["/docs", "/photos"])
+        }
+    }
+
+    @Test("Removing a pending download leaves the rest of the queue")
+    func pendingDownloadsRemove() throws {
+        try withDatabase { db, _ in
+            try db.addPendingDownload("/photos")
+            try db.addPendingDownload("/docs")
+
+            try db.removePendingDownload("/photos")
+
+            try #expect(db.pendingDownloads() == ["/docs"])
+        }
+    }
+
+    @Test("Removing something that is not queued is not an error")
+    func pendingDownloadsRemoveMissing() throws {
+        try withDatabase { db, _ in
+            try db.removePendingDownload("/nothing")
+
+            try #expect(db.pendingDownloads().isEmpty)
+        }
+    }
+
+    @Test("The queue survives closing and reopening the database")
+    func pendingDownloadsPersist() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("auster-db-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("sync.db").path
+
+        try SyncDatabase(path: path).addPendingDownload("/photos")
+
+        let reopened = try SyncDatabase(path: path)
+        #expect(reopened.wasResetOnOpen == false)
+        try #expect(reopened.pendingDownloads() == ["/photos"])
+    }
+
+    // MARK: - Corruption recovery
+
+    @Test("A corrupt file is thrown away and replaced with an empty database")
+    func corruptionRecovery() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("auster-db-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("sync.db").path
+
+        // A plausible-looking SQLite header followed by rubbish: enough that
+        // opening succeeds and reading does not.
+        var garbage = Data("SQLite format 3\u{0}".utf8)
+        garbage.append(Data(repeating: 0xAB, count: 4_096))
+        try garbage.write(to: URL(fileURLWithPath: path))
+
+        let db = try SyncDatabase(path: path)
+
+        #expect(db.wasResetOnOpen == true)
+        try #expect(db.indexCount() == 0)
+        // And the fresh database is fully usable.
+        try db.upsertIndexEntry(entry("/a.txt"))
+        try #expect(db.indexCount() == 1)
+    }
+
+    @Test("An existing healthy database is not reset")
+    func healthyDatabaseIsNotReset() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("auster-db-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("sync.db").path
+
+        try SyncDatabase(path: path).upsertIndexEntry(entry("/a.txt"))
+
+        let reopened = try SyncDatabase(path: path)
+        #expect(reopened.wasResetOnOpen == false)
+        try #expect(reopened.indexCount() == 1)
+    }
 }

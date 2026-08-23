@@ -68,7 +68,7 @@ public final class SyncDatabase: Sendable {   // GRDB DatabasePool wrapper
 public enum StateKey: String { case remoteCursor, localCursorTimestamp, didFinishIndexing, indexingCounter, excludedItems /* JSON array */ }
 ```
 
-- [ ] TDD: round-trips for each table; subtree queries match prefix semantics
+- [x] TDD: round-trips for each table; subtree queries match prefix semantics
   (`"/a"` matches `/a` and `/a/b`, not `/ab`); hash cache invalidation on mtime
   change; corruption recovery (write garbage file → init succeeds,
   `wasResetOnOpen == true`). Commit per table group.

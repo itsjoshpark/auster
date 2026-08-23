@@ -328,4 +328,53 @@ public final class SyncDatabase: Sendable {
             )
         }
     }
+
+    // MARK: - State
+
+    public func stateString(_ key: StateKey) throws -> String? {
+        try pool.read { db in
+            try StateRecord.fetchOne(db, key: key.rawValue)?.value
+        }
+    }
+
+    /// Sets a state value, or removes the key when `value` is `nil`.
+    ///
+    /// Removing rather than storing an empty string keeps "never set" distinct
+    /// from "set to nothing" — the difference between "never indexed" and an
+    /// empty cursor is the difference between a full re-index and a no-op.
+    public func setState(_ key: StateKey, _ value: String?) throws {
+        try pool.write { db in
+            guard let value else {
+                _ = try StateRecord.deleteOne(db, key: key.rawValue)
+                return
+            }
+            try StateRecord(key: key.rawValue, value: value).save(db)
+        }
+    }
+
+    // MARK: - Pending downloads
+
+    /// Paths newly included by selective sync that still need fetching
+    /// (engine-doc §1.5). Persisted, so a restart mid-download resumes rather
+    /// than silently leaving a folder empty.
+    public func pendingDownloads() throws -> [String] {
+        try pool.read { db in
+            try PendingDownloadRecord
+                .order(sql: "dbx_path_lower")
+                .fetchAll(db)
+                .map(\.dbxPathLower)
+        }
+    }
+
+    public func addPendingDownload(_ pathLower: String) throws {
+        try pool.write { db in
+            try PendingDownloadRecord(dbxPathLower: pathLower).save(db)
+        }
+    }
+
+    public func removePendingDownload(_ pathLower: String) throws {
+        try pool.write { db in
+            _ = try PendingDownloadRecord.deleteOne(db, key: pathLower)
+        }
+    }
 }
