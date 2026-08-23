@@ -18,14 +18,14 @@ refresh token in env; all operations confined to remote
 `/AusterIntegrationTests/<UUID>` with a local temp root; `tearDown` deletes the
 remote folder even on failure.
 
-- [ ] Tests: round-trip small file (verify local `ContentHasher` output equals
+- [x] Tests: round-trip small file (verify local `ContentHasher` output equals
   server `contentHash` — the cross-check promised in Phase 3); 12 MiB session
   upload; remote edit via API → longpoll fires → downloaded; conflicted-copy
   server behavior on stale-rev upload matches `MockDropboxService`'s simulation
   (assert same naming shape — this validates the mock's contract); delete with
   stale parentRev rejected; cursor survives listFolderContinue across changes;
   special filenames (emoji, NFD composed accents, ` (1)` suffixes) round-trip.
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 9.2: Fatal-path recovery UI
 

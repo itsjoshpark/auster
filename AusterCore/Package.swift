@@ -27,5 +27,15 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
+        // Opt-in, and opt-in twice: AUSTER_INTEGRATION=1 plus a credential.
+        // Without both, every test in it reports as skipped, so `swift test`
+        // stays green on a machine with no Dropbox account (api-notes §7).
+        .testTarget(
+            name: "AusterCoreIntegrationTests",
+            dependencies: [
+                "AusterCore",
+                .product(name: "SwiftyDropbox", package: "SwiftyDropbox"),
+            ]
+        ),
     ]
 )
