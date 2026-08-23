@@ -45,14 +45,14 @@ flag → surface as a special event the coordinator turns into the folder-missin
 check. Always verify against current disk state when flags are ambiguous —
 correctness comes from the cleaning stage + rescans, not perfect flag decoding.
 
-- [ ] TDD IgnoreFilter pure logic: one-shot match consumed; recursive dir ignore
+- [x] TDD IgnoreFilter pure logic: one-shot match consumed; recursive dir ignore
   drops child events (moved: both src+dst must be children); non-matching passes;
   TTL expiry (inject clock).
-- [ ] LocalFileMonitor integration-style test in a temp dir: create/modify/delete
+- [x] LocalFileMonitor integration-style test in a temp dir: create/modify/delete
   → events arrive; op inside `ignoring` → no event; rename → single `.moved`
   (allow fallback pair created+deleted — assert via cleaned output of Task 5.2 to
   avoid flag-decoding flakiness).
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 5.2: Event cleaning
 

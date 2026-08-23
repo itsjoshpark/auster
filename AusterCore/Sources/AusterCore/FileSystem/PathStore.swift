@@ -83,9 +83,14 @@ public struct PathStore: Sendable {
     }
 
     /// The local URL for a correctly cased Dropbox path.
+    ///
+    /// Built lexically: the one-argument `appendingPathComponent` stats the path
+    /// to decide whether to append a trailing slash, which would give a folder
+    /// one URL before it exists and a different one after — and the FS-event
+    /// ignore filter compares these against what the watcher reports.
     public func toLocalURL(dbxPathCased: String) -> URL {
         let relative = dbxPathCased.split(separator: "/", omittingEmptySubsequences: true)
-        return relative.reduce(root) { $0.appendingPathComponent(String($1)) }
+        return relative.reduce(root) { $0.appendingPathComponent(String($1), isDirectory: false) }
     }
 
     // MARK: - Case correction
