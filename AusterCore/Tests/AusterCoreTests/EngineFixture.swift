@@ -21,6 +21,7 @@ final class EngineFixture {
     let database: SyncDatabase
     let pathStore: PathStore
     let hasher: CachedContentHasher
+    let fileOps: LocalFileOperations
 
     init() throws {
         root = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -32,6 +33,7 @@ final class EngineFixture {
         database = try SyncDatabase(path: root.appendingPathComponent("sync.db").path)
         pathStore = PathStore(dropboxRoot: dropbox, database: database, service: service)
         hasher = CachedContentHasher(database: database)
+        fileOps = LocalFileOperations(root: dropbox)
     }
 
     deinit {

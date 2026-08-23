@@ -113,7 +113,7 @@ public struct LocalFileOperations: Sendable {          // all mutations route th
 public struct ExpectedFSEvent: Sendable, Equatable { public enum Kind { case created, deleted, modified, moved(to: URL) }; public let kind: Kind; public let url: URL; public let isDirectory: Bool; public let recursive: Bool }
 ```
 
-- [ ] TDD: atomic move replaces existing file and preserves its POSIX permissions
+- [x] TDD: atomic move replaces existing file and preserves its POSIX permissions
   when asked; exact-casing delete refuses `A.txt` when disk has `a.txt`;
   `ensureRootPresent` throws when root missing or casing drifted; cache dir
   auto-created and named `.auster.cache` (also add it to the excluded-names set —
