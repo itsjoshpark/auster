@@ -31,7 +31,9 @@ struct ContentHasherTests {
     private func bytes(_ count: Int, seed: UInt64 = 0x5DEE_CE66) -> Data {
         var state = seed | 1
         var data = Data(count: count)
-        data.withUnsafeMutableBytes { raw in
+        // Parameter type spelled out: the untyped closure is ambiguous between
+        // Foundation's raw-buffer and deprecated typed-pointer overloads.
+        data.withUnsafeMutableBytes { (raw: UnsafeMutableRawBufferPointer) in
             for index in 0..<count {
                 state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
                 raw[index] = UInt8(truncatingIfNeeded: state >> 33)
