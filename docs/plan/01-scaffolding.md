@@ -81,5 +81,5 @@ self-contained regardless).
      `xcrun xcresulttool get test-results tests --path TestResults.xcresult
      --compact` JSON (test-case → failure-message nodes with file:line), and
      upload `TestResults.xcresult` as an artifact.
-- [ ] Push a branch to verify the workflow passes on GitHub before merging.
+- [x] Push a branch to verify the workflow passes on GitHub before merging.
   Commit.
