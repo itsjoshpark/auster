@@ -301,6 +301,20 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
         try lock.withLock {
             try enter(.listFolder)
             let root = Self.key(for: path)
+            // Dropbox answers a listing of a path that is not a folder with
+            // `path/not_found` or `path/not_folder`; it does not treat "no
+            // entries under this prefix" as an empty folder. An engine tested
+            // only against the lenient answer would never meet the strict one
+            // (found by the integration suite, note N39). The root is the one
+            // path that always exists, even on an empty account.
+            if !root.isEmpty {
+                guard let node = nodes[root] else {
+                    throw DropboxServiceError.notFound(path: Self.normalized(path))
+                }
+                guard node.metadata.asFolder != nil else {
+                    throw DropboxServiceError.conflict(path: Self.normalized(path))
+                }
+            }
             let matching = nodes.keys
                 .filter { Self.isDescendant($0, of: root, recursive: recursive) }
                 .sorted()

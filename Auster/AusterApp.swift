@@ -27,10 +27,20 @@ struct AusterApp: App {
             SettingsView(environment: environment)
         }
 
+        // This window is opened from the menu and nowhere else (ux §6), and it
+        // takes two modifiers to hold SwiftUI to that. `handlesExternalEvents`
+        // with an empty set is the load-bearing one: the OAuth redirect arrives
+        // as an open-URL event, and SwiftUI answers one by presenting its first
+        // eligible `Window` scene so that something can receive it — Auster
+        // reads the redirect from the app delegate instead (note N6), so no
+        // scene should volunteer. `defaultLaunchBehavior(.suppressed)` covers
+        // the same window being offered at launch.
         Window("Sync Issues", id: SyncIssuesWindow.id) {
             SyncIssuesWindow(environment: environment)
         }
         .defaultSize(width: 560, height: 360)
+        .defaultLaunchBehavior(.suppressed)
+        .handlesExternalEvents(matching: [])
     }
 }
 
@@ -69,7 +79,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let onboardingController = OnboardingWindowController()
 
+    /// Whether this process is hosting a test bundle rather than being run by
+    /// somebody.
+    ///
+    /// `AusterTests` uses `Auster.app` as its test host, so everything below
+    /// runs before a single test does. Two consequences, both bad: the
+    /// single-instance guard sees the developer's own running Auster and
+    /// terminates the host before the runner connects ("Early unexpected exit …
+    /// exited with code 0 before establishing connection"), and on a machine
+    /// where it *did* proceed, `environment.start()` would point the real engine
+    /// at the real Dropbox folder for the duration of a unit-test run.
+    private static var isRunningTests: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A test host launches the app to load a bundle into it, and wants none
+        // of what follows.
+        guard !Self.isRunningTests else { return }
+
         // One Auster at a time (ux §9). Two instances over one database and one
         // watched folder would each see the other's writes as the user's.
         if case .deferToExisting = SingleInstance.decision(

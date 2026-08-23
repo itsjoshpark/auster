@@ -451,3 +451,67 @@ is the state the update controls were written for in Phase 8: an app installed b
 something other than Sparkle has no updater either. The type was renamed from
 Phase 8's `UpdaterController` to keep it distinct from Sparkle's own
 `SPUStandardUpdaterController`.
+
+### N39. The mock refuses to list a path that is not a folder (Phase 9 follow-up)
+The first run of the integration suite against a real account failed two tests,
+and both failures were in the *test doubles*, not the engine:
+
+- `MockDropboxService.listFolder` answered a listing of a folder that does not
+  exist with an empty page. Dropbox answers `path/not_found`, and
+  `path/not_folder` when a file occupies the path (mapped to `.conflict` by
+  `DropboxErrorMapper`). "No entries under this prefix" and "no such folder" are
+  different facts, and an engine only ever tested against the lenient answer
+  never meets the strict one. The mock now checks the root exists and is a
+  folder; the Dropbox root (`""`) is exempt, since it exists even on an empty
+  account.
+- `IntegrationScope.upload` sent `autorename: false`, but `UploadApplier` sends
+  `autorename: true` on every upload it makes. That is the whole difference
+  between Dropbox *refusing* a stale-rev write and Dropbox writing a conflicted
+  copy beside the original, so the test guarding D9.1 — the no-lost-update
+  guarantee — was exercising a call the engine never issues. Confirmed against
+  the live API: `update(staleRev)` + `autorename: false` → `path/conflict/file`;
+  the same write with `autorename: true` → `name (… conflicted copy).ext`. The
+  engine's behaviour was correct throughout; only the harness was wrong.
+
+`IntegrationScope.make()` also replaces `init()` at the call sites, so each
+scope's remote folder exists before a test lists it — Dropbox creates parents
+implicitly on upload, which is why the gap went unnoticed.
+
+### N40. Clearing a sync issue is per path, not per subtree (Phase 9 follow-up)
+`SyncEngine.record` cleared errors with `clearSyncErrors(pathLower:)`, which
+deletes the whole subtree. The comment on that method — "re-syncing a folder
+should clear the issues of the children it is about to retry" — describes a case
+that does not hold in the upload direction: a folder event syncs the folder, not
+what is in it, and a folder whose upload *skips* retries nothing at all.
+
+Found live. A read-only folder failed a child's download and recorded an issue;
+restoring the permission fired an FS event for the folder, whose upload skipped
+and took the child's issue with it. The file then existed on Dropbox, was absent
+from disk and from the index, and the interface reported no sync issues — with
+nothing left to retry, since the startup sequence builds its retry list from
+exactly those rows.
+
+`clearSyncError(exactPathLower:)` now backs the success path, except for a
+`.removed` event, where the subtree really has gone. `removeExcluded` keeps
+subtree semantics for the same reason.
+
+The clue worth remembering: the error disappeared without a history row being
+written. `recordHistory` ignores `.skipped` completions, so "issue cleared, no
+history" is the signature of an issue cleared by something that did not sync.
+
+### N41. The Sync Issues window opts out of external events (Phase 9 follow-up)
+On a fresh setup the Sync Issues window appeared by itself, uninvited, the
+moment the OAuth redirect came back — before the user had finished the wizard.
+Nothing calls `openWindow` for it outside the menu row, and there was no saved
+application state.
+
+The trigger is the open-URL event specifically: activating the app by other
+means does not do it, and sending the app a `db-<appkey>://` URL by hand
+reproduces it every time. SwiftUI answers an external event by presenting its
+first eligible `Window` scene so that something can receive it. Auster reads the
+redirect from the app delegate instead (N6), so no scene should volunteer —
+`handlesExternalEvents(matching: [])` says exactly that.
+
+`defaultLaunchBehavior(.suppressed)` sits alongside it and covers presentation
+at launch. It is *not* sufficient on its own: tried first, and the window still
+appeared on the redirect, which is what narrowed the trigger to external events.

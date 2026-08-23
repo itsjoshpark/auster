@@ -23,7 +23,7 @@ struct IntegrationTests {
     /// same?" decision in the engine is wrong.
     @Test("a small file round-trips and its content hash matches ours")
     func smallFileRoundTrip() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
         let bytes = Data("the quick brown fox\n".utf8)
 
         let uploaded = try await scope.upload("small.txt", contents: bytes)
@@ -44,7 +44,7 @@ struct IntegrationTests {
     /// exercised at all.
     @Test("a 12 MiB file goes up through an upload session with its hash intact")
     func largeFileUsesUploadSession() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
         // Pseudo-random rather than zeroes: a run of identical blocks would hash
         // correctly even if the chunks were assembled in the wrong order.
         var generator = SeededGenerator(seed: 0x5EED_1234)
@@ -67,7 +67,7 @@ struct IntegrationTests {
     /// longpoll and is then visible through the same cursor (api-notes §2).
     @Test("longpoll reports a remote edit and the cursor delivers it")
     func longpollSeesARemoteEdit() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
         try await scope.upload("watched.txt", contents: Data("before".utf8))
 
         let page = try await scope.service.listFolder(path: scope.remotePath, recursive: true)
@@ -92,7 +92,7 @@ struct IntegrationTests {
     /// from the beginning every time (decisions D9.4).
     @Test("a cursor keeps working across successive changes")
     func cursorSurvivesSuccessiveChanges() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
         var cursor = try await scope.service.listFolder(path: scope.remotePath, recursive: true).cursor
 
         for index in 1...3 {
@@ -116,7 +116,7 @@ struct IntegrationTests {
     /// simulates.
     @Test("uploading against a stale rev produces a conflicted copy, not an overwrite")
     func staleRevUploadConflicts() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
         let original = try await scope.upload("contested.txt", contents: Data("first".utf8))
 
         // Somebody else writes; our rev is now stale.
@@ -150,7 +150,7 @@ struct IntegrationTests {
     /// we have not seen yet is never destroyed (decisions D9.5).
     @Test("deleting with a stale parentRev is refused")
     func staleParentRevDeleteIsRefused() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
         let original = try await scope.upload("guarded.txt", contents: Data("first".utf8))
         try await scope.upload("guarded.txt", contents: Data("second".utf8), mode: .overwrite)
 
@@ -172,7 +172,7 @@ struct IntegrationTests {
     /// accented name it ever sees (engine-doc §9).
     @Test("emoji, decomposed accents and parenthesised suffixes round-trip")
     func specialFilenamesRoundTrip() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
 
         let names = [
             "hello 🌍 world.txt",
@@ -204,7 +204,7 @@ struct IntegrationTests {
     /// truncated somewhere in the round trip.
     @Test("a 255-byte name round-trips")
     func longNameRoundTrips() async throws {
-        let scope = try IntegrationScope()
+        let scope = try await IntegrationScope.make()
         let name = String(repeating: "a", count: 251) + ".txt"
 
         let uploaded = try await scope.upload(name, contents: Data("long".utf8))

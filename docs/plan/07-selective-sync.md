@@ -62,5 +62,10 @@ tests `Tests/.../FolderTreeModelTests.swift`.
   spinner, Apply + Revert buttons calling
   `coordinator.setExcluded(items: model.resultingExcludedSet())`. Manual check
   against live account. Commit.
-      *The view and its model are done and committed; the manual check against a
-      live account is outstanding — it needs Josh's Dropbox account.*
+      *Done 2026-08-23 against the test account, through the setup wizard: the
+      tree lazily loaded the real top-level folders, expanding Projects fetched
+      Alpha and Beta, unchecking Beta made Projects mixed (N27), and the
+      resulting exclusion kept `/Projects/Beta` off disk while everything else
+      downloaded — `excludedItems` persisted as `["/projects/beta"]`.
+      **Still outstanding:** exclude/re-include from the Settings tab on a
+      folder that is already synced, which needs the Settings window.*

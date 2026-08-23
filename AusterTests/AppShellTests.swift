@@ -22,7 +22,7 @@ struct AppShellTests {
     @Test("The menu bar window builds")
     func menuBarViewBuilds() {
         let (settings, suiteName) = Self.isolatedSettings()
-        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        defer { removeTestDefaults(suiteName: suiteName) }
 
         _ = MenuBarView(environment: AppEnvironment(auth: nil, settings: settings))
     }
@@ -33,7 +33,7 @@ struct AppShellTests {
     @Test("An environment with no account needs setting up")
     func unlinkedEnvironmentNeedsSetup() async {
         let (settings, suiteName) = Self.isolatedSettings()
-        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        defer { removeTestDefaults(suiteName: suiteName) }
         let environment = AppEnvironment(auth: nil, settings: settings)
 
         await environment.start()
@@ -49,7 +49,7 @@ struct AppShellTests {
     @Test("An account without a chosen folder still needs setting up")
     func linkedWithoutFolderNeedsSetup() async {
         let (settings, suiteName) = Self.isolatedSettings()
-        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        defer { removeTestDefaults(suiteName: suiteName) }
         let environment = AppEnvironment(auth: nil, settings: settings)
 
         #expect(settings.dropboxFolderURL == nil)
@@ -64,7 +64,7 @@ struct AppShellTests {
     @Test("Snoozing suppresses notifications until its deadline passes")
     func snoozeExpiresByItself() {
         let (settings, suiteName) = Self.isolatedSettings()
-        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        defer { removeTestDefaults(suiteName: suiteName) }
 
         #expect(!settings.isSnoozed)
         settings.snoozeNotifications(for: 1800)

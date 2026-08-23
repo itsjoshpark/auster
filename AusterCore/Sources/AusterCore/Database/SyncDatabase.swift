@@ -266,6 +266,22 @@ public final class SyncDatabase: Sendable {
         }
     }
 
+    /// Clears the error for exactly one path, leaving anything under it.
+    ///
+    /// Syncing a folder does not sync what is inside it, so a folder that
+    /// succeeds must not take its children's issues with it — a child that is
+    /// still missing has to keep its error, or the startup sequence stops
+    /// retrying it and the interface reports that all is well (note N40).
+    public func clearSyncError(exactPathLower: String) throws {
+        try pool.write { db in
+            let matching = SyncErrorRecord.filter(
+                sql: "dbx_path_lower = ?",
+                arguments: [PathStore.normalize(exactPathLower)]
+            )
+            _ = try matching.deleteAll(db)
+        }
+    }
+
     /// Clears every error for one direction, as a sync cycle does before it
     /// retries the paths it is responsible for.
     public func clearSyncErrors(direction: SyncDirection) throws {

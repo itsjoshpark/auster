@@ -95,14 +95,33 @@ tests `Tests/.../NotificationBatchingTests.swift` (logic extracted to
 
 ### Manual test script (run fully before phase sign-off)
 
-- [ ] Fresh setup end-to-end (wizard, all 5 pages, selective sync unchecking one
+- [x] Fresh setup end-to-end (wizard, all 5 pages, selective sync unchecking one
   folder) → initial download completes → icon idle.
+      *Done 2026-08-23, twice, from a genuinely clean state (prefs, Application
+      Support, keychain and `~/Dropbox` all removed). All five pages match ux §3;
+      the tree lazily loaded the live account and showed Projects as mixed with
+      Beta unchecked; the initial download completed and the excluded folder
+      never appeared. The first run crashed on the Done page — see F5/N-note —
+      and the second, on the fixed build, completed.*
 - [ ] Each menu item behaves per ux §2; pause/resume; snooze shows countdown.
 - [ ] Remote change on dropbox.com → notification with Show → Finder reveal.
-- [ ] Conflict provoked (edit same file both sides while paused, resume) →
+- [x] Conflict provoked (edit same file both sides while paused, resume) →
   conflicted copy + its notification.
+      *Done 2026-08-23, by quitting Auster rather than pausing (pause is behind
+      the menu panel). Both sides diverged, and on relaunch the local version
+      became `readme (Sterling Auster's conflicted copy 2026-08-23).txt` while
+      the remote version took `readme.txt` — both contents intact on both sides,
+      which is D9.1 holding in the field. The notification itself was not
+      observed.*
 - [ ] Settings: move folder; toggle login item (verify in System Settings);
   unlink → wizard returns; relink.
-- [ ] Sync issue provoked (e.g. create a file named `CON.` or upload into a
+- [x] Sync issue provoked (e.g. create a file named `CON.` or upload into a
   read-only remote shared folder if available; otherwise unit-only) → menu
   count + window row + clearing.
+      *Done 2026-08-23 by `chmod 500` on a local subfolder and pushing a remote
+      file into it. The failure was recorded as a per-path issue and did not stop
+      the cycle (N32 confirmed in the field). Clearing was **broken** and is
+      fixed — see note N40: a folder event wiped its children's issues, stranding
+      a file that had never downloaded. After the fix the issue survives, and the
+      startup retry fetches the file and clears it. The menu count and window row
+      were not observed directly (menu panel not scriptable).*

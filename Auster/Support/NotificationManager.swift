@@ -48,19 +48,34 @@ final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
     // MARK: - SyncNotifying
 
     func notifyDownloadBatch(_ completed: [SyncItemEvent]) {
-        post(composer.downloadBatch(completed))
+        compose { $0.downloadBatch(completed) }
     }
 
     func notifyConflict(_ event: SyncItemEvent) {
-        post(composer.conflict(event))
+        compose { $0.conflict(event) }
     }
 
     func notifyItemError(_ error: SyncItemError) {
-        post(composer.itemError(error))
+        compose { $0.itemError(error) }
     }
 
     func notifyFatal(_ error: SyncFatalError) {
-        post(composer.fatal(error))
+        compose { $0.fatal(error) }
+    }
+
+    /// Decides on the main actor, then delivers.
+    ///
+    /// The composer's inputs are `@MainActor` state in the app — the linked
+    /// account, the snooze, the master switch — reached through
+    /// `MainActor.assumeIsolated`. `SyncNotifying` is called from the
+    /// coordinator's actor, so composing on the caller's executor runs those
+    /// closures off the main actor and `assumeIsolated` traps the process. The
+    /// hop has to happen before the decision, not just before the delivery.
+    private func compose(_ decide: @escaping @Sendable (NotificationComposer) -> SyncNotification?) {
+        let composer = composer
+        Task { @MainActor in
+            post(decide(composer))
+        }
     }
 
     /// Says that a re-index is under way after the database had to be recreated
@@ -69,6 +84,7 @@ final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
     /// Not part of `SyncNotifying`: nothing failed, and nothing about a sync
     /// cycle happened. What it explains is why Auster is about to be busy for a
     /// while — activity with no cause is what makes a sync client look broken.
+    @MainActor
     func rebuildingIndex() {
         post(
             SyncNotification(
@@ -80,6 +96,7 @@ final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
 
     // MARK: - Delivery
 
+    @MainActor
     private func post(_ notification: SyncNotification?) {
         guard let notification else { return }
 

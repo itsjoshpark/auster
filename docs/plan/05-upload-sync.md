@@ -53,6 +53,9 @@ correctness comes from the cleaning stage + rescans, not perfect flag decoding.
   (allow fallback pair created+deleted — assert via cleaned output of Task 5.2 to
   avoid flag-decoding flakiness).
 - [x] Commit.
+      *Live check done 2026-08-23 against the test account: local create, edit,
+      move and delete all reached Dropbox within five seconds, and a 15 MiB file
+      uploaded through a session with its sha256 intact.*
 
 ### Task 5.2: Event cleaning
 
