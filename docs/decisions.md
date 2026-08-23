@@ -109,3 +109,43 @@ SwiftyDropbox 10.2.4 exposes it as a plain mutable class property, so touching
 it from `AusterCore` fails to compile under language mode 6. Phase 2's
 `DropboxService` must own the client behind its own isolation rather than
 reading that global from arbitrary contexts.
+
+### N5. `AuthManager` stays in `AusterCore`; only presentation is injected (Phase 2)
+The plan puts `AuthManager` in `AusterCore` and has it call
+`DropboxClientsManager.authorizeFromControllerV2`, but that route is
+`#if os(macOS)` + `import AppKit` and takes an `NSApplication` — which
+`AusterCore` may not touch. Two consequences:
+
+- `AusterCore` defines `AuthorizationPresenter` (open a URL, show an error);
+  the app target implements it with `NSWorkspace`/`NSAlert`. An internal
+  `SharedApplicationBridge` adapts it to SwiftyDropbox's AppKit-free
+  `SharedApplication` protocol, which is what the SDK actually drives the flow
+  through.
+- `KeychainDropboxLinkStore` owns its own `DropboxOAuthManager` instance
+  (public init, same keychain storage) rather than going through
+  `DropboxClientsManager`, whose `authorizedClient` global Swift 6 refuses to
+  read (N4 — confirmed: it is an error, not a warning, even from `@MainActor`).
+  Clients are built with
+  `DropboxClient(accessToken:dropboxOauthManager:)`, so token refresh still
+  comes for free.
+
+`AuthManager`'s public interface is unchanged from the phase file; the store is
+a constructor dependency, which is also what makes the link outcomes testable
+without a browser.
+
+### N6. The OAuth redirect arrives via the app delegate, not `.onOpenURL` (Phase 2)
+The phase file specifies `.onOpenURL`. That modifier needs a view on screen,
+and a menu-bar-only app's `MenuBarExtra` window is built lazily when the user
+clicks the icon — precisely when the redirect is *not* on screen. Auster uses
+`@NSApplicationDelegateAdaptor` with `application(_:open:)` instead, which is
+always live. A missing app key is reported by the same delegate with a modal
+alert and then terminates the app, as the phase file requires.
+
+### N7. Downloads are hash-verified after the SDK writes them (Phase 2)
+The plan describes feeding `ContentHasher.Streaming` as bytes arrive.
+SwiftyDropbox's file download owns the write itself (temp file → destination
+move) and exposes only a `Progress` callback, so there is no byte stream to
+intercept. `LiveDropboxService` therefore hashes the written file and compares
+it to the metadata's `contentHash`, deleting the file and throwing
+`.dataCorrupted` on a mismatch. Same guarantee — nothing corrupt is ever staged
+for the atomic move (D9.3) — at the cost of one extra read.

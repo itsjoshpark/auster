@@ -87,8 +87,8 @@ public enum DropboxServiceError: Error, Sendable, Equatable {
 }
 ```
 
-- [ ] TDD model conveniences (pathLower accessor, `RemoteMetadata` equality).
-- [ ] Commit.
+- [x] TDD model conveniences (pathLower accessor, `RemoteMetadata` equality).
+- [x] Commit.
 
 ### Task 2.2: Mock service
 
@@ -103,12 +103,12 @@ list/continue over the change log, autorename semantics (`" (2)"`, conflicted
 copies for `.update` mismatches per api-notes §2), `parentRev`-guarded deletes.
 Configurable per-call error injection: `mock.failNext(.upload, with: .connection)`.
 
-- [ ] TDD the fake's own semantics (they're the contract later scenario tests
+- [x] TDD the fake's own semantics (they're the contract later scenario tests
   trust): add→list shows entry; update with stale rev + autorename → server-style
   conflicted copy name; delete with wrong parentRev → `.conflict`; continue after
   changes returns only the delta; move reports delete+add in the change log
   (mirrors real Dropbox — moves are never reported as moves, api-notes §3).
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 2.3: Content hasher + live service
 
@@ -127,18 +127,18 @@ public enum ContentHasher {
 }
 ```
 
-- [ ] TDD `ContentHasher` against the api-notes §4 algorithm: empty file,
+- [x] TDD `ContentHasher` against the api-notes §4 algorithm: empty file,
   < 4 MiB, exactly 4 MiB, 4 MiB + 1 — compute expected values with a tiny
   reference implementation inside the test (SHA256 per block, concatenate raw
   digests, SHA256 again). `Streaming` must equal the whole-file result across
   uneven chunk boundaries. (Phase 9's integration suite cross-checks against a
   real upload's server `contentHash`.) Commit.
 
-- [ ] `Retry.swift`: `func withRetry<T>(policy:operation:)` — exponential backoff
+- [x] `Retry.swift`: `func withRetry<T>(policy:operation:)` — exponential backoff
   + jitter; honors `.rateLimited(retryAfter:)` and longpoll `backoff`; max 10
   attempts for `.dataCorrupted`/`.tooManyWriteOperations`, no retry for
   `.notFound`/`.notAuthorized`/etc. TDD with a fake clock.
-- [ ] `LiveDropboxService` wraps `DropboxClient` (injected), converting callbacks
+- [x] `LiveDropboxService` wraps `DropboxClient` (injected), converting callbacks
   to async via continuations and `CallError` → `DropboxServiceError` (mapping per
   api-notes §5). Upload implements the 4 MiB single-call/session split with
   mid-upload change detection (stat before/after read → throw
@@ -146,9 +146,9 @@ public enum ContentHasher {
   `ContentHasher.Streaming` on the fly; on final mismatch with metadata's
   `contentHash`, delete the partial file and throw `.dataCorrupted` (the retry
   layer re-attempts up to 10×).
-- [ ] Error-mapping unit tests (construct SDK error values → assert mapped enum).
+- [x] Error-mapping unit tests (construct SDK error values → assert mapped enum).
   Live network calls are NOT unit-tested; covered by Phase 9 integration suite.
-- [ ] Commit.
+- [x] Commit.
 
 ### Task 2.4: Auth manager + app wiring
 
@@ -168,13 +168,13 @@ tests `Tests/.../AuthManagerTests.swift`.
 public enum LinkOutcome: Equatable { case linked(AccountInfo), cancelled, teamAccountNotSupported, failed(String) }
 ```
 
-- [ ] App: `DropboxClientsManager.setupWithAppKeyDesktop(AppKey.value)` at launch
+- [x] App: `DropboxClientsManager.setupWithAppKeyDesktop(AppKey.value)` at launch
   (`AppKey` reads Info.plist value injected from xcconfig; fatal, user-visible
   alert if placeholder). `.onOpenURL` → `handleRedirect`.
-- [ ] `handleRedirect`: on success fetch `currentAccount()`; if `isTeam` →
+- [x] `handleRedirect`: on success fetch `currentAccount()`; if `isTeam` →
   `unlink()` and return `.teamAccountNotSupported` (UI copy: "**Not supported**:
   Auster does not support Dropbox team accounts.").
-- [ ] Temporary debug UI in the MenuBarExtra window: Link/Unlink button + linked
+- [x] Temporary debug UI in the MenuBarExtra window: Link/Unlink button + linked
   account email label (replaced in Phase 8).
-- [ ] TDD outcome logic with mock service (team rejection, cancel). Manual check
+- [x] TDD outcome logic with mock service (team rejection, cancel). Manual check
   with Josh's key: link → email appears; unlink → back to link button. Commit.
