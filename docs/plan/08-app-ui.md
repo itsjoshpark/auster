@@ -43,7 +43,7 @@ modify `Auster/AusterApp.swift`; tests `Tests (app target)/StatusIconTests.swift
 create `AusterCore/.../State/OnboardingModel.swift`;
 tests `Tests/.../OnboardingModelTests.swift`.
 
-- [ ] `OnboardingModel`: page state machine per ux §3 (welcome → link → folder →
+- [x] `OnboardingModel`: page state machine per ux §3 (welcome → link → folder →
   selective → done), link via `AuthManager` (spinner while awaiting redirect;
   team account → error page with "Not supported: Auster does not support Dropbox
   team accounts."), folder selection (default `~/Dropbox`; existing non-empty →
@@ -51,7 +51,7 @@ tests `Tests/.../OnboardingModelTests.swift`.
   the engine's content-hash checks make it correct), selective page embeds
   `FolderTreeModel` tree, done → persist config + `coordinator.start()`. TDD
   transitions incl. cancel-and-unlink from folder page.
-- [ ] Fixed ~550×400 window shown when `.needsSetup`; closing it quits. Manual
+- [x] Fixed ~550×400 window shown when `.needsSetup`; closing it quits. Manual
   run-through fresh (delete app support + unlink first). Commit.
 
 ### Task 8.3: Settings window

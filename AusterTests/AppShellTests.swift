@@ -24,7 +24,7 @@ struct AppShellTests {
         let (settings, suiteName) = Self.isolatedSettings()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
 
-        _ = MenuBarView(environment: AppEnvironment(link: LinkController(auth: nil), settings: settings))
+        _ = MenuBarView(environment: AppEnvironment(auth: nil, settings: settings))
     }
 
     /// Without an account there is nothing to coordinate, and the interface says
@@ -34,7 +34,7 @@ struct AppShellTests {
     func unlinkedEnvironmentNeedsSetup() async {
         let (settings, suiteName) = Self.isolatedSettings()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
-        let environment = AppEnvironment(link: LinkController(auth: nil), settings: settings)
+        let environment = AppEnvironment(auth: nil, settings: settings)
 
         await environment.start()
 
@@ -50,7 +50,7 @@ struct AppShellTests {
     func linkedWithoutFolderNeedsSetup() async {
         let (settings, suiteName) = Self.isolatedSettings()
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
-        let environment = AppEnvironment(link: LinkController(auth: nil), settings: settings)
+        let environment = AppEnvironment(auth: nil, settings: settings)
 
         #expect(settings.dropboxFolderURL == nil)
         await environment.start()

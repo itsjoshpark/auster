@@ -24,7 +24,11 @@ final class AppEnvironment {
     /// The only thing views read about preferences.
     let settings: AppSettings
 
-    let link: LinkController
+    /// The Dropbox link, or `nil` in a build with no app key.
+    let auth: AuthManager?
+
+    /// The setup wizard, alive only while it is on screen.
+    private(set) var onboarding: OnboardingModel?
 
     /// Sparkle arrives in Phase 10; until then this reports itself unavailable
     /// and the update controls say so.
@@ -40,20 +44,38 @@ final class AppEnvironment {
 
     private var database: SyncDatabase?
 
-    init(link: LinkController, settings: AppSettings = AppSettings()) {
-        self.link = link
+    init(auth: AuthManager?, settings: AppSettings = AppSettings()) {
+        self.auth = auth
         self.settings = settings
     }
+
+    /// Builds the environment the app runs on, from the app key the build
+    /// carries.
+    static func fromBundle() -> AppEnvironment {
+        guard let appKey = AppKey.value else { return AppEnvironment(auth: nil) }
+        return AppEnvironment(
+            auth: AuthManager(
+                store: KeychainDropboxLinkStore(
+                    appKey: appKey,
+                    presenter: AppKitAuthorizationPresenter()
+                )
+            )
+        )
+    }
+
+    var isLinked: Bool { auth?.isLinked ?? false }
+
+    private var service: (any DropboxService)? { auth?.service }
 
     // MARK: - Lifecycle
 
     /// Restores the link, then starts sync if there is anything to sync.
     func start() async {
-        await link.restore()
+        await auth?.restore()
 
         // Setup is not finished until there is both an account and somewhere to
         // put its files (ux §3); either one missing sends the user to the wizard.
-        guard link.isLinked, settings.dropboxFolderURL != nil else {
+        guard isLinked, settings.dropboxFolderURL != nil else {
             state.setLinked(false)
             return
         }
@@ -64,10 +86,47 @@ final class AppEnvironment {
         await coordinator.start()
     }
 
-    /// Ends onboarding: remembers the chosen folder and brings sync up.
-    func finishSetup(dropboxFolder: URL) async {
+    /// The wizard, built fresh each time it is shown.
+    func beginOnboarding() -> OnboardingModel {
+        let model = OnboardingModel(auth: auth) { [weak self] folder, excluded in
+            await self?.finishSetup(dropboxFolder: folder, excludedItems: excluded)
+        }
+        onboarding = model
+        return model
+    }
+
+    func endOnboarding() {
+        onboarding = nil
+    }
+
+    /// Consumes an OAuth redirect, telling the wizard about it if one is open.
+    func handleRedirect(_ urls: [URL]) async {
+        guard let auth else { return }
+        for url in urls {
+            let outcome = await auth.handleRedirect(url: url)
+            if let onboarding {
+                onboarding.handle(outcome)
+            } else if case .linked = outcome, coordinator == nil {
+                // Relinked from Settings rather than from the wizard.
+                await start()
+            }
+        }
+    }
+
+    /// Ends onboarding: remembers the choices and brings sync up.
+    ///
+    /// The selection is written through the coordinator *before* the first sync
+    /// so the initial index already filters it — a folder the user deselected in
+    /// the wizard should never arrive and then be deleted again.
+    func finishSetup(dropboxFolder: URL, excludedItems: Set<String>) async {
         settings.dropboxFolderURL = dropboxFolder
-        await start()
+        guard isLinked else { return }
+        state.setLinked(true)
+
+        guard let coordinator = buildCoordinator() else { return }
+        self.coordinator = coordinator
+        await coordinator.setExcluded(items: excludedItems)
+        await coordinator.start()
     }
 
     func pause() async {
@@ -99,7 +158,7 @@ final class AppEnvironment {
         await coordinator?.stopForQuit()
         coordinator = nil
         database = nil
-        await link.unlink()
+        await auth?.unlink()
 
         if let directory = try? Self.applicationSupportDirectory() {
             try? FileManager.default.removeItem(at: directory)
@@ -117,7 +176,7 @@ final class AppEnvironment {
     /// exactly this (implementation note N10), and the UI has no business
     /// opening the engine's tables.
     func makeFolderTreeModel() -> FolderTreeModel? {
-        guard let service = link.service else { return nil }
+        guard let service else { return nil }
         return FolderTreeModel(service: service, excluded: settings.config.excludedItems)
     }
 
@@ -175,7 +234,7 @@ final class AppEnvironment {
     private func buildCoordinator() -> SyncCoordinator? {
         let config = settings.config
         let dropbox = dropboxFolderURL
-        guard let service = link.service else { return nil }
+        guard let service else { return nil }
 
         do {
             try FileManager.default.createDirectory(at: dropbox, withIntermediateDirectories: true)

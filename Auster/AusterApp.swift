@@ -65,12 +65,12 @@ private struct StatusIconLabel: View {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
-    let environment = AppEnvironment(link: LinkController.fromBundle())
+    let environment = AppEnvironment.fromBundle()
 
-    private var link: LinkController { environment.link }
+    private let onboardingController = OnboardingWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        guard link.auth != nil else {
+        guard environment.auth != nil else {
             // Without an app key the app cannot link, and everything else
             // depends on being linked. Say so plainly and stop.
             let alert = NSAlert()
@@ -83,17 +83,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        Task { await environment.start() }
+        Task {
+            await environment.start()
+            // The wizard is the app until it has been through: a menu-bar icon
+            // is not a call to action for someone who has never seen Auster.
+            if environment.state.status == .needsSetup {
+                onboardingController.show(environment)
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        Task {
-            await link.handle(urls)
-            // A successful link is the moment there is something to coordinate.
-            if link.isLinked, environment.coordinator == nil {
-                await environment.start()
-            }
-        }
+        Task { await environment.handleRedirect(urls) }
     }
 
     /// Sync state is persisted incrementally — cursors and index rows are
