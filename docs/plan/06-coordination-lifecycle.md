@@ -32,7 +32,7 @@ tests `Tests/.../SyncStateTests.swift`.
 public struct ActivityItem: Identifiable, Sendable, Equatable { public var id: String /* dbxPathLower */; public var dbxPath: String; public var direction: SyncDirection; public var completed: Int64; public var total: Int64 }
 ```
 
-- [ ] TDD state mutation helpers (activity add/update/remove, status precedence:
+- [x] TDD state mutation helpers (activity add/update/remove, status precedence:
   fatalError > paused > syncing > connecting > idle). Commit.
 
 ### Task 6.2: SyncCoordinator
