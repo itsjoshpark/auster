@@ -274,9 +274,11 @@ public final class SyncDatabase: Sendable {
     /// retrying it and the interface reports that all is well (note N40).
     public func clearSyncError(exactPathLower: String) throws {
         try pool.write { db in
-            _ = try SyncErrorRecord
-                .filter(sql: "dbx_path_lower = ?", arguments: [PathStore.normalize(exactPathLower)])
-                .deleteAll(db)
+            let matching = SyncErrorRecord.filter(
+                sql: "dbx_path_lower = ?",
+                arguments: [PathStore.normalize(exactPathLower)]
+            )
+            _ = try matching.deleteAll(db)
         }
     }
 

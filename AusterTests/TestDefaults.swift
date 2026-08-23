@@ -14,8 +14,7 @@ func removeTestDefaults(suiteName: String) {
     guard
         let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
     else { return }
-    let plist = library
-        .appendingPathComponent("Preferences", isDirectory: true)
-        .appendingPathComponent("\(suiteName).plist", isDirectory: false)
+    let preferences = library.appendingPathComponent("Preferences", isDirectory: true)
+    let plist = preferences.appendingPathComponent("\(suiteName).plist", isDirectory: false)
     try? FileManager.default.removeItem(at: plist)
 }
