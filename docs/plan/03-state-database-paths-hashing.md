@@ -92,7 +92,7 @@ public struct PathStore: Sendable {
 }
 ```
 
-- [ ] TDD: normalization (case + NFD→NFC), round-trip local↔dbx, out-of-root
+- [x] TDD: normalization (case + NFD→NFC), round-trip local↔dbx, out-of-root
   throws, conflicted-copy naming (extension preserved, dotfiles, collision
   suffixes), case-sensitivity probe in a temp dir, `correctCase` resolution order
   (seed index → no service call; unknown parent → one metadata call, cached
