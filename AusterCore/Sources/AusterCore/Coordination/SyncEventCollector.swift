@@ -27,9 +27,12 @@ public final class SyncEventCollector: Sendable {
 
     /// Takes everything gathered so far and empties the box.
     func drain() -> [(event: SyncItemEvent, completion: SyncCompletion)] {
-        storage.withLock {
-            defer { $0.completed.removeAll() }
-            return $0.completed
+        // Named rather than `$0`: a shorthand argument is not in scope inside
+        // the nested closure a `defer` body is, and compilers disagree about
+        // whether to say so.
+        storage.withLock { storage in
+            defer { storage.completed.removeAll() }
+            return storage.completed
         }
     }
 }
