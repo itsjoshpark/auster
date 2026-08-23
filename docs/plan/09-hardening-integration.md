@@ -47,17 +47,17 @@ wiring; tests `Tests/.../RecoveryFlowTests.swift` (model logic only).
 
 ### Task 9.3: Edge-case sweep (unit tests on existing components)
 
-- [ ] Filename edge tests through the scenario harness: emoji, NFD/NFC pairs
+- [x] Filename edge tests through the scenario harness: emoji, NFD/NFC pairs
   (create NFD locally → uploads NFC, no rename loop — engine-doc §9), 255-byte
   names, leading dots, `Icon\r` excluded, path with `/` depth 20.
-- [ ] Clock skew: remote clientModified in the future → local mtime clamped to
+- [x] Clock skew: remote clientModified in the future → local mtime clamped to
   now (engine-doc §4.6 step 6).
-- [ ] Disk full during download (simulate via tiny quota dir if feasible, else
+- [x] Disk full during download (simulate via tiny quota dir if feasible, else
   inject write error in `LocalFileOperations`) → item error recorded, cycle
   continues, cache dir cleaned.
-- [ ] Read-only local file replaced by remote update (permissions preserved,
+- [x] Read-only local file replaced by remote update (permissions preserved,
   no crash).
-- [ ] Symlink round-trip local→remote→second-client simulation (mock).
-- [ ] App Nap / sleep: after `NSWorkspace.willSleepNotification` →
+- [x] Symlink round-trip local→remote→second-client simulation (mock).
+- [x] App Nap / sleep: after `NSWorkspace.willSleepNotification` →
   `didWakeNotification`, coordinator runs a catch-up + download cycle (add this
   wiring in `AppEnvironment`). Commit each green cluster.

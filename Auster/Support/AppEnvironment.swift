@@ -50,6 +50,9 @@ final class AppEnvironment {
     /// otherwise raise a second alert behind the first.
     private var isRecovering = false
 
+    private var sleepObservers: [any NSObjectProtocol] = []
+    private var hasSlept = false
+
     /// Called when Auster no longer has what it needs to sync and the wizard has
     /// to come back — which today means the user unlinked from Settings.
     ///
@@ -193,6 +196,38 @@ final class AppEnvironment {
     /// Sends the user back through the browser after a revoked token.
     func relink() {
         auth?.beginLink()
+    }
+
+    // MARK: - Sleep and wake (ux §9)
+
+    /// Re-checks both sides after the machine wakes.
+    ///
+    /// Neither loop survives a sleep in any useful sense: the longpoll
+    /// connection is dead, and FSEvents owes nothing about what other devices
+    /// did in the meantime. Rather than wait for the longpoll to time out and
+    /// retry — which can be a minute or more, on the one occasion the user is
+    /// most likely to be looking — waking runs the same two cycles startup runs.
+    ///
+    /// `willSleep` is watched only so that a `didWake` without one is ignored.
+    func observeSleepAndWake() {
+        let center = NSWorkspace.shared.notificationCenter
+
+        sleepObservers.append(
+            center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) {
+                [weak self] _ in
+                MainActor.assumeIsolated { self?.hasSlept = true }
+            }
+        )
+        sleepObservers.append(
+            center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) {
+                [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.hasSlept else { return }
+                    self.hasSlept = false
+                    Task { await self.coordinator?.syncNow() }
+                }
+            }
+        )
     }
 
     /// Moves the Dropbox folder and points the engine at its new home (ux §4).

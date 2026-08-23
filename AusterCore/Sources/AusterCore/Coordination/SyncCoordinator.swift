@@ -257,6 +257,31 @@ public actor SyncCoordinator {
         await stopLoops()
     }
 
+    /// Re-checks both sides immediately, without waiting for the loops.
+    ///
+    /// The case this exists for is waking from sleep. While the machine was
+    /// asleep the longpoll connection died, and FSEvents has no obligation to
+    /// report what happened on other devices at all — so neither loop is holding
+    /// a promise that the two sides still agree. Running the same two cycles
+    /// startup runs is the cheapest way to find out.
+    ///
+    /// Does nothing while the user has paused: waking a laptop is not a request
+    /// to undo that.
+    public func syncNow() async {
+        let paused = await MainActor.run { config.isPaused }
+        guard !paused else { return }
+
+        do {
+            try await engine.downloadCycle()
+            await finishCycle(notifyDownloads: true)
+            try await engine.catchUpScan()
+            await finishCycle(notifyDownloads: false)
+            await markOnline()
+        } catch {
+            await handle(error)
+        }
+    }
+
     /// Throws the index away and derives it again from both sides (§9).
     ///
     /// Safe precisely because the index is not data: everything in it can be

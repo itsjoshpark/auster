@@ -26,13 +26,16 @@ final class ScenarioHarness {
     private let collector: EventCollector
     private var watcher: Task<Void, Never>?
 
-    init(excluded: Set<String> = []) throws {
+    /// Passing an existing `service` is how a *second* client is simulated: a
+    /// fresh local folder and a fresh index over a Dropbox that already has
+    /// something in it.
+    init(excluded: Set<String> = [], service: MockDropboxService = MockDropboxService()) throws {
         root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("auster-scenario-\(UUID().uuidString)")
         dropbox = root.appendingPathComponent("Dropbox", isDirectory: false)
         try FileManager.default.createDirectory(at: dropbox, withIntermediateDirectories: true)
 
-        service = MockDropboxService()
+        self.service = service
         database = try SyncDatabase(path: root.appendingPathComponent("sync.db").path)
         pathStore = PathStore(dropboxRoot: dropbox, database: database, service: service)
         hasher = CachedContentHasher(database: database)

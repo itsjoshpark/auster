@@ -206,6 +206,13 @@ public actor SyncEngine {
     /// The distinction is what keeps a cycle useful: a file Dropbox will not
     /// name should not stop the other nine hundred, while a revoked token means
     /// every one of them would fail the same way.
+    ///
+    /// The local filesystem is on the per-path side of that line too, and that
+    /// is easy to get wrong. A folder the user made read-only, a name the volume
+    /// will not take, a disk that filled up between two files — each of those
+    /// arrives as a `CocoaError` or a POSIX errno rather than as anything
+    /// Dropbox-shaped, and letting one escape would stop all syncing and report
+    /// a fatal error over a single file.
     private func record(
         _ event: SyncItemEvent,
         _ handler: () async throws -> SyncCompletion
@@ -221,17 +228,28 @@ public actor SyncEngine {
             case .connection, .cursorReset: throw error
             default: break
             }
-
-            let itemError = SyncItemError(
-                dbxPath: event.dbxPath,
-                dbxPathLower: event.dbxPathLower,
-                direction: event.direction,
-                title: Self.failureTitle(for: event),
-                message: error.localizedDescription
-            )
-            try database.upsertSyncError(itemError.entry)
-            events.itemCompleted(event, .failed(itemError))
+            try recordFailure(of: event, message: error.localizedDescription)
+        } catch let error as SyncFatalError {
+            // The folder is gone, or the account is: nothing about this is
+            // specific to one path.
+            throw error
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try recordFailure(of: event, message: error.localizedDescription)
         }
+    }
+
+    private func recordFailure(of event: SyncItemEvent, message: String) throws {
+        let itemError = SyncItemError(
+            dbxPath: event.dbxPath,
+            dbxPathLower: event.dbxPathLower,
+            direction: event.direction,
+            title: Self.failureTitle(for: event),
+            message: message
+        )
+        try database.upsertSyncError(itemError.entry)
+        events.itemCompleted(event, .failed(itemError))
     }
 
     private static func failureTitle(for event: SyncItemEvent) -> String {
