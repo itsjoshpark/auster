@@ -79,15 +79,15 @@ tests `Tests/.../OnboardingModelTests.swift`.
 tests `Tests/.../NotificationBatchingTests.swift` (logic extracted to
 `AusterCore/.../State/NotificationComposer.swift`).
 
-- [ ] `NotificationComposer` (pure, TDD): batch → title/body/action per
+- [x] `NotificationComposer` (pure, TDD): batch → title/body/action per
   engine-doc §10 + ux §8 ("You"/name resolution via account cache; 1 item →
   "<who> added <name>" + Show; many → counts; deletions → deleted-files URL;
   conflicts individually; nothing for own uploads — composer only ever receives
   download batches + conflicts by construction). Snooze + master switch
   suppress change notifications, never error ones.
-- [ ] `NotificationManager`: UNUserNotificationCenter; request permission on
+- [x] `NotificationManager`: UNUserNotificationCenter; request permission on
   first notification after setup completes (ux §8); actions open Finder/URLs.
-- [ ] Sync Issues window per ux §6: list rows (icon, name, path, error title +
+- [x] Sync Issues window per ux §6: list rows (icon, name, path, error title +
   message; actions reveal-in-Finder / open on dropbox.com); rows disappear when
   `state.syncErrors` clears. Commit.
 

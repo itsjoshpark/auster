@@ -304,7 +304,7 @@ final class AppEnvironment {
                 state: state,
                 engine: engine,
                 monitor: monitor,
-                notifier: PlaceholderNotifier(),
+                notifier: makeNotifier(),
                 collector: collector,
                 connection: ConnectionMonitor()
             )
@@ -312,6 +312,25 @@ final class AppEnvironment {
             state.setFatalError(.unexpected(error.localizedDescription))
             return nil
         }
+    }
+
+    /// The notifier the coordinator talks to, over the composer's rules.
+    ///
+    /// Every input is read through a closure rather than captured: the account,
+    /// the master switch and the snooze all change while sync is running, and a
+    /// notifier built once at launch would go on using whatever they were then.
+    private func makeNotifier() -> NotificationManager {
+        let settings = settings
+        let state = state
+        return NotificationManager(
+            composer: NotificationComposer(
+                ownAccountId: { MainActor.assumeIsolated { state.account?.accountId } },
+                changeNotificationsSuppressed: {
+                    MainActor.assumeIsolated { !settings.notificationsEnabled || settings.isSnoozed }
+                }
+            ),
+            reveal: { [weak self] path in self?.revealInFinder(dbxPath: path) }
+        )
     }
 
     /// `~/Dropbox` (decisions D3).
@@ -338,16 +357,4 @@ final class AppEnvironment {
         try applicationSupportDirectory()
             .appendingPathComponent("sync.db", isDirectory: false).path
     }
-}
-
-/// Stands in until Task 8.4 wires up `UserNotifications`.
-///
-/// Deliberately silent rather than logging: the notification *rules* of
-/// engine-doc §10 live in the real implementation, and a half-built version
-/// would be something to unlearn.
-private struct PlaceholderNotifier: SyncNotifying {
-    func notifyDownloadBatch(_ completed: [SyncItemEvent]) {}
-    func notifyConflict(_ event: SyncItemEvent) {}
-    func notifyItemError(_ error: SyncItemError) {}
-    func notifyFatal(_ error: SyncFatalError) {}
 }
