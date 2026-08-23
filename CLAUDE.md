@@ -52,3 +52,17 @@ running Xcode. Prefer the CLI loop (`Scripts/test.sh`, `xcodebuild`) as the
 default; use Xcode MCP when live build issues or running the app would help,
 and ask Josh to open the project if it isn't. It cannot exist before Phase 1
 creates the project.
+
+## Checking SwiftyDropbox APIs
+
+Never guess SDK signatures. After package resolution, the exact pinned
+SwiftyDropbox source is in the build's SPM checkout
+(`SourcePackages/checkouts/SwiftyDropbox` in DerivedData, or
+`AusterCore/.build/checkouts/SwiftyDropbox`) — read it to verify route
+methods, parameter labels, enum cases, and error types. Before resolution, a
+reference clone may exist at
+`/Users/josh/Developer/maestral-project/SwiftyDropbox` (tracks master, may be
+newer than the pin — prefer the resolved checkout when both exist).
+`docs/research/dropbox-api-notes.md` remains authoritative for *behavior*
+(write modes, longpoll timing, retries); the SDK source is for exact API
+shapes.
