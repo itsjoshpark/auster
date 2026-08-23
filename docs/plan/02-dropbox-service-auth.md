@@ -127,7 +127,7 @@ public enum ContentHasher {
 }
 ```
 
-- [ ] TDD `ContentHasher` against the api-notes §4 algorithm: empty file,
+- [x] TDD `ContentHasher` against the api-notes §4 algorithm: empty file,
   < 4 MiB, exactly 4 MiB, 4 MiB + 1 — compute expected values with a tiny
   reference implementation inside the test (SHA256 per block, concatenate raw
   digests, SHA256 again). `Streaming` must equal the whole-file result across
