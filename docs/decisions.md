@@ -421,3 +421,33 @@ controls, and a credential in the environment is the same secret with none of
 that ambiguity. `Scripts/test.sh` and the CI workflow both pass
 `--skip IntegrationTests`, so the network round trips are never paid for by
 accident.
+
+### N36. The release scripts version `Config/Shared.xcconfig`, not `project.pbxproj` (Phase 10)
+The phase file has `project-version.sh` reading and writing `project.pbxproj`,
+which is where FrontRow keeps its versions. Auster's have lived in
+`Config/Shared.xcconfig` since Phase 1 — every configuration of every target uses
+it as its base configuration — and `project.pbxproj` does not mention them at
+all. The script keeps its name and its commands and takes the xcconfig instead.
+One consequence: an xcconfig defines each setting once, where a pbxproj carries
+one per configuration, so the script insists on exactly one definition rather
+than two. A second definition would silently win over the first, which is a
+reason to stop rather than something to rewrite.
+
+### N37. The release build takes the Dropbox app key from a repository secret (Phase 10)
+`Config/Secrets.xcconfig` is gitignored, so a CI checkout has no app key, and an
+Auster built without one puts up "Missing Dropbox app key" and quits — it would
+have been a release nobody could use. The release workflow writes the key from a
+`DROPBOX_APP_KEY` repository secret into `Config/Secrets.xcconfig` before the
+archive. The ordinary CI build deliberately does *not*: nothing it does needs a
+real key, and `AppShellTests` already skips the one test that would.
+
+### N38. Sparkle's updater is started by hand, so an unusable one is a state and not an alert (Phase 10)
+`SPUStandardUpdaterController(startingUpdater: true)` answers a failed start with
+an alert at launch. Starting fails for ordinary reasons — an unsigned local
+build, the placeholder public key that ships until Josh generates the real pair —
+and none of them are worth interrupting the user over. `UpdaterManager` starts
+the updater itself, and a failure simply leaves `canCheckForUpdates` false, which
+is the state the update controls were written for in Phase 8: an app installed by
+something other than Sparkle has no updater either. The type was renamed from
+Phase 8's `UpdaterController` to keep it distinct from Sparkle's own
+`SPUStandardUpdaterController`.

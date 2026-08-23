@@ -31,10 +31,34 @@ DEAD_CODE_STRIPPING = YES
 //
 // Auster is not sandboxed: a user-chosen sync folder plus full file access
 // make the App Sandbox impractical (decisions.md D2). Developer ID signing and
-// notarization are configured in Phase 10.
+// notarization happen in the release workflow, which passes the identity and
+// team on the command line — a local build stays ad-hoc signed.
 
 ENABLE_APP_SANDBOX = NO
 CODE_SIGN_STYLE = Automatic
+
+// MARK: - Sparkle updates
+//
+// The appcast is served from the repository's default branch, which is why the
+// release workflow refuses to run from anywhere else: a feed entry stranded on
+// a side branch would never reach an installed copy.
+//
+// "//" opens a comment in an xcconfig, so the URL scheme's separator is broken
+// up with an empty $() expansion. The value that reaches Info.plist is the
+// ordinary https URL.
+
+SU_FEED_URL = https:/$()/raw.githubusercontent.com/itsjoshpark/auster/main/.sparkle/appcast.xml
+
+// The public half of the EdDSA key pair the release workflow signs each build
+// with. Sparkle refuses an update whose signature this key does not verify, so
+// a placeholder simply means no updater: `UpdaterManager` reports itself
+// unavailable and the update controls disappear.
+//
+// Replace with the key printed by Sparkle's `generate_keys` (the private half
+// becomes the SPARKLE_ED_PRIVATE_KEY repository secret and is never committed).
+// See docs/release-process.md.
+
+SU_PUBLIC_ED_KEY = replace_with_the_sparkle_public_key
 
 // MARK: - Dropbox app key
 //

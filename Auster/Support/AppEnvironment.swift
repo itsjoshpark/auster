@@ -30,9 +30,9 @@ final class AppEnvironment {
     /// The setup wizard, alive only while it is on screen.
     private(set) var onboarding: OnboardingModel?
 
-    /// Sparkle arrives in Phase 10; until then this reports itself unavailable
-    /// and the update controls say so.
-    let updater = UpdaterController()
+    /// Sparkle, or a stand-in that reports itself unavailable where the build
+    /// cannot update itself.
+    let updater: UpdaterManager
 
     /// `nil` until an account and a folder exist — there is nothing to
     /// coordinate before then.
@@ -66,6 +66,7 @@ final class AppEnvironment {
     init(auth: AuthManager?, settings: AppSettings = AppSettings()) {
         self.auth = auth
         self.settings = settings
+        updater = UpdaterManager(checkInterval: settings.updateCheckInterval)
     }
 
     /// Builds the environment the app runs on, from the app key the build
@@ -138,6 +139,24 @@ final class AppEnvironment {
             Task { @MainActor in
                 self?.observeFatalErrors()
                 await self?.recoverIfNeeded()
+            }
+        }
+    }
+
+    /// Keeps Sparkle's automatic checks in step with the setting.
+    ///
+    /// The preference is the switch the user sees, so it has to be the one that
+    /// decides; Sparkle keeps its own copy in the defaults and would otherwise
+    /// go on using whatever it was told at launch. One-shot tracking, re-armed
+    /// each time it fires, as with `observeFatalErrors`.
+    func observeUpdateCheckInterval() {
+        withObservationTracking {
+            _ = settings.updateCheckInterval
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.observeUpdateCheckInterval()
+                self.updater.apply(checkInterval: self.settings.updateCheckInterval)
             }
         }
     }

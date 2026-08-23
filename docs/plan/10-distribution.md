@@ -23,15 +23,19 @@ skeleton), `.sparkle/notes/TEMPLATE.md`, `.sparkle/notes/next.md` (copy of
 template), `.sparkle/notes/README.md`; modify `AboutTab.swift`,
 `GeneralTab.swift`, `Info.plist`.
 
-- [ ] `SPUStandardUpdaterController` wired to the About tab button and the
+- [x] `SPUStandardUpdaterController` wired to the About tab button and the
   menu-bar "Check for Updates…"; automatic-check interval bound to the
   existing `updateCheckInterval` setting (Never → disabled).
-- [ ] Info.plist (via xcconfig): `SUFeedURL =
+- [x] Info.plist (via xcconfig): `SUFeedURL =
   https://raw.githubusercontent.com/itsjoshpark/auster/main/.sparkle/appcast.xml`
   (the feed is *published from main* — this constrains the release workflow to
   run from main only), and `SUPublicEDKey` (ask Josh to run Sparkle's
   `generate_keys`; the private key becomes a GitHub secret, never committed).
-- [ ] Release-notes flow: notes for the *next* release are written to
+      *`SU_FEED_URL` and `SU_PUBLIC_ED_KEY` are in `Config/Shared.xcconfig`. The
+      public key is the placeholder `replace_with_the_sparkle_public_key` until
+      Josh generates the pair; the app reports itself as having no updater and
+      the release workflow refuses to publish until it is replaced.*
+- [x] Release-notes flow: notes for the *next* release are written to
   `.sparkle/notes/next.md` before releasing (template-checked by the
   workflow); on release they ship to GitHub as Markdown and to the appcast as
   HTML, then are archived as `.sparkle/notes/<version>.md`. Document this in
@@ -44,19 +48,21 @@ template), `.sparkle/notes/README.md`; modify `AboutTab.swift`,
 `render-notes.sh` + `.test.sh`. Modify `.github/workflows/ci.yml`: add a
 second job running `Scripts/release/*.test.sh` (installs `cmark-gfm`).
 
-- [ ] `bump-version.sh <current> <major|minor|patch>` → prints bumped semver.
-- [ ] `project-version.sh read-marketing <pbxproj>` /
+- [x] `bump-version.sh <current> <major|minor|patch>` → prints bumped semver.
+- [x] `project-version.sh read-marketing <pbxproj>` /
   `project-version.sh write <pbxproj> <version> <build>` — reads/writes
   `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.pbxproj`.
-- [ ] `render-notes.sh <notes.md>` → HTML on stdout via `cmark-gfm` (GitHub
+      *They live in `Config/Shared.xcconfig`, not `project.pbxproj` — the script
+      takes the xcconfig instead (implementation note N36).*
+- [x] `render-notes.sh <notes.md>` → HTML on stdout via `cmark-gfm` (GitHub
   gets the Markdown as written; the appcast gets this HTML — same source, so
   both read the same).
-- [ ] `append-appcast-item.sh --appcast --version --build --url --signature
+- [x] `append-appcast-item.sh --appcast --version --build --url --signature
   --length --notes --pub-date --minimum-system-version` — inserts a new
   `<item>` (with `sparkle:version` = build, `sparkle:shortVersionString`,
   enclosure url/signature/length, HTML notes, pubDate, minimumSystemVersion)
   at the **top** of the feed, preserving the rest of the file byte-for-byte.
-- [ ] Tests cover happy paths + malformed input; CI job runs them. Commit.
+- [x] Tests cover happy paths + malformed input; CI job runs them. Commit.
 
 ### Task 10.3: Release workflow
 
@@ -72,44 +78,44 @@ second job running `Scripts/release/*.test.sh` (installs `cmark-gfm`).
 release, cancel-in-progress: false`; `permissions: contents: write`; runs on
 `macos-26`. Steps, in order:
 
-- [ ] **Checkout with `fetch-depth: 0`** (the build number is
+- [x] **Checkout with `fetch-depth: 0`** (the build number is
   `git rev-list --count HEAD`; a shallow clone would return 1 and strand every
   existing user), setup-xcode latest-stable, `brew install cmark-gfm`, run the
   Task 10.2 script tests first.
-- [ ] **Resolve version step with hard guards** (all before the expensive
+- [x] **Resolve version step with hard guards** (all before the expensive
   build): must run from `main` (the appcast is served from main); marketing
   version read from `project.pbxproj` and bumped by `release-type`; build =
   commit count; fail if tag `v<version>` exists; fail if build ≤ newest
   `sparkle:version` already in the appcast (Sparkle would never offer the
   update); fail if `.sparkle/notes/next.md` is missing, still equals the
   template, or `<version>.md` already exists.
-- [ ] **Render notes to HTML** now (malformed notes fail before the build,
+- [x] **Render notes to HTML** now (malformed notes fail before the build,
   not after).
-- [ ] **Credentials**: decode the App Store Connect `.p8` key to
+- [x] **Credentials**: decode the App Store Connect `.p8` key to
   `$RUNNER_TEMP` (chmod 600, deleted in an `if: always()` step); import the
   Developer ID `.p12` into an **ephemeral keychain** created with a random
   password (`security create-keychain` / `import -T /usr/bin/codesign` /
   `set-key-partition-list`), never the login keychain.
-- [ ] **Preflight** (cheap, before the ~15-min build): a `Developer ID
+- [x] **Preflight** (cheap, before the ~15-min build): a `Developer ID
   Application` identity is present; warn <30 days to certificate expiry, fail
   if expired; `notarytool history` accepts the API key.
-- [ ] **Archive** (`xcodebuild archive`, Release, `generic/platform=macOS`,
+- [x] **Archive** (`xcodebuild archive`, Release, `generic/platform=macOS`,
   derived data + archive paths under `$RUNNER_TEMP`) injecting
   `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` on the command line;
   **export** with `ExportOptions.plist`; **verify** the exported app:
   CFBundleVersion/ShortVersionString match, `codesign --verify --deep
   --strict`, and the signing authority is a Developer ID Application cert (the
   archive may carry a dev signature; only the export re-signs).
-- [ ] **DMG**: `npm install -g create-dmg` (sindresorhus's, not the Homebrew
+- [x] **DMG**: `npm install -g create-dmg` (sindresorhus's, not the Homebrew
   formula — different flags) + `brew install graphicsmagick imagemagick`;
   `create-dmg --no-code-sign` → `Auster_v<version>.dmg`.
-- [ ] **Notarize + staple**: `notarytool submit --wait`, `stapler staple`,
+- [x] **Notarize + staple**: `notarytool submit --wait`, `stapler staple`,
   `stapler validate`; upload the DMG as a workflow artifact.
-- [ ] **Publication gate:** nothing above changes anything outside the runner;
+- [x] **Publication gate:** nothing above changes anything outside the runner;
   every step below is skipped when `dry-run` is true.
-- [ ] **Tag + GitHub Release** (`gh release create v<version>` with the DMG
+- [x] **Tag + GitHub Release** (`gh release create v<version>` with the DMG
   and the Markdown notes).
-- [ ] **Appcast + write-back commit**: sign the DMG with Sparkle's
+- [x] **Appcast + write-back commit**: sign the DMG with Sparkle's
   `sign_update` (EdDSA private key from secrets via stdin, binary found under
   the build's `SourcePackages/artifacts/sparkle`); `append-appcast-item.sh`
   with the release URL
@@ -120,7 +126,7 @@ release, cancel-in-progress: false`; `permissions: contents: write`; runs on
   template; commit `chore: release <version> (<build>) [skip ci]` and push to
   main with **rebase-and-retry ×3** (the release is already public — a
   rejected push must not strand the feed).
-- [ ] `docs/release-process.md`: the runbook — write `next.md`, run the
+- [x] `docs/release-process.md`: the runbook — write `next.md`, run the
   workflow (dry-run first), secrets inventory and rotation notes
   (the Developer ID certificate expires after 5 years; the API and EdDSA keys
   don't). Commit.
@@ -135,6 +141,10 @@ public EdDSA key for Info.plist.
 
 - [ ] Dry-run release on Actions → DMG artifact installs and launches on a
   clean machine.
+      *Outstanding: the workflow, the scripts and the runbook are done and
+      committed, but no run can succeed until the six repository secrets exist
+      and `SU_PUBLIC_ED_KEY` is a real key. `docs/release-process.md` has the
+      inventory and the commands.*
 - [ ] Real release v0.1.0; install it, bump a dummy v0.1.1 dry run… then
   verify Sparkle update flow end-to-end with a real v0.1.1 when there is
   something to ship. Commit any fixes.
