@@ -9,8 +9,9 @@ order (design → decisions → research docs), the global constraints, and the
 10-phase implementation plan in `docs/plan/`. Work phases in order; check off
 `- [ ]` boxes in the phase files as you go and commit them with the code.
 
-The docs are self-contained: everything learned from Maestral and the Dropbox
-API is captured in `docs/research/`. Do not go looking for Maestral's source.
+The docs are self-contained: the sync-engine algorithms, Dropbox API notes,
+and the UX spec are all captured in `docs/research/` — everything you need is
+in this repo.
 
 ## Hard rules
 
@@ -23,8 +24,9 @@ API is captured in `docs/research/`. Do not go looking for Maestral's source.
 - Dependencies: SwiftyDropbox, GRDB, Sparkle only. Anything else: ask Josh.
 - TDD: failing test first, then code, then commit. Swift 6 language mode with
   zero concurrency warnings.
-- **Conventional Commits** for every commit message (`feat:`, `fix:`, `docs:`,
-  `chore:`, `test:`, `refactor:`). Imperative mood, no attribution footers.
+- **Conventional Commits** for every commit message AND every PR title
+  (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`). Imperative mood,
+  no attribution footers.
 - Never commit secrets. The Dropbox app key lives in gitignored
   `Config/Secrets.xcconfig` — ask Josh for the key when Phase 2 needs it.
 

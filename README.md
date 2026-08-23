@@ -1,10 +1,11 @@
 # Auster
 
-An open-source Dropbox sync client for macOS, in the spirit of
-[Maestral](https://github.com/samschott/maestral): a plain local folder
-(default `~/Dropbox`) kept in two-way sync with your Dropbox account, driven
-from a menu bar icon. No Electron, no daemons, no on-demand placeholder files —
-just your files, on disk, synced.
+<img src="design/AppIcon/preview@512.png" alt="Auster app icon" width="128" align="right"/>
+
+An open-source Dropbox sync client for macOS: a plain local folder (default
+`~/Dropbox`) kept in two-way sync with your Dropbox account, driven from a
+menu bar icon. No Electron, no daemons, no on-demand placeholder files — just
+your files, on disk, synced.
 
 **Status: planning / pre-implementation.** The full design and implementation
 plan live in [`docs/`](docs/); implementation starts from
@@ -26,7 +27,7 @@ team/business accounts.
 ## Requirements
 
 - macOS 15 (Sequoia) or later
-- Xcode 16+ to build
+- Xcode 26+ to build
 - A Dropbox API app key (development builds; see
   `Config/Secrets.xcconfig.template` once scaffolding lands)
 
