@@ -181,3 +181,5 @@ removes it from the excluded set (§8).
   children — seed mock to emit children first); cursor reset path; excluded
   subtree never touches disk.
 - [ ] Manual verification with the real account (see phase header). Commit.
+      *Blocked: needs Josh's linked Dropbox account (see "When to ask Josh").
+      Everything else in this phase is green under the scenario tests.*
