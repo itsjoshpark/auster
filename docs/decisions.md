@@ -381,3 +381,43 @@ comparing *names* would collapse two unknown people into one and announce
 name once there is exactly one to resolve. An unattributed change is "You" —
 Dropbox reports an author only inside shared folders, and everywhere else nobody
 but the account holder can write.
+
+### N32. A local filesystem failure is a per-path sync issue, not a fatal error (Phase 9)
+`SyncEngine.record` caught only `DropboxServiceError`, so anything the local
+filesystem refused — a folder the user made read-only, a name the volume would
+not take, a disk that filled between two files — escaped the per-item handler,
+aborted the whole cycle, and reached the coordinator's funnel as
+`SyncFatalError.unexpected`. One unwritable folder therefore stopped all syncing.
+It now catches everything except `SyncFatalError` and `CancellationError`, and
+records the rest as a sync issue for that path, which is what design §5 says a
+per-path failure is. Found by Task 9.3's disk-full test.
+
+### N33. Symlinks are a download-direction feature only (Phase 9)
+Task 9.3 asks for a "symlink round-trip local→remote→second-client". There is no
+such round trip to test: `files/upload` cannot create a symlink, so a link the
+user makes locally goes up as its target's *content*, and `MockDropboxService`
+models exactly that. The two tests written instead are the two real behaviours —
+a symlink already in Dropbox (which is how one gets there) arriving at a fresh
+client as a symlink rather than as content, and a local symlink uploading once
+and not looping on the next pass.
+
+### N34. Making a file read-only reads as an unsynced local change (Phase 9)
+`chmod` bumps a file's ctime, which is the same signal an edit gives, so a
+read-only file with a pending remote update is set aside as a conflicted copy
+rather than replaced (engine-doc §4.4 rule 5). That is the safe outcome and the
+one Task 9.3's test asserts: the protected file survives untouched, with its
+permission bits, and the remote version lands beside it. The
+`preservePermissions` path of `atomicMoveIntoPlace` still applies to updates with
+no local change, and is covered in `LocalFileOperationsTests`.
+
+### N35. The integration suite is opt-in twice, and skipped in CI (Phase 9)
+`AusterCoreIntegrationTests` runs only when `AUSTER_INTEGRATION=1` *and* a
+credential is present (`AUSTER_TEST_TOKEN`, or `AUSTER_TEST_REFRESH_TOKEN` with
+`AUSTER_APP_KEY`); otherwise every test reports as skipped with the reason. The
+phase file also offers reading the app's keychain entry, which is not used: a
+`swift test` process has a different bundle identity, so whether it can read
+those items is a property of keychain ACLs rather than of anything Auster
+controls, and a credential in the environment is the same secret with none of
+that ambiguity. `Scripts/test.sh` and the CI workflow both pass
+`--skip IntegrationTests`, so the network round trips are never paid for by
+accident.

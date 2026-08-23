@@ -63,6 +63,21 @@ final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
         post(composer.fatal(error))
     }
 
+    /// Says that a re-index is under way after the database had to be recreated
+    /// (engine-doc §9).
+    ///
+    /// Not part of `SyncNotifying`: nothing failed, and nothing about a sync
+    /// cycle happened. What it explains is why Auster is about to be busy for a
+    /// while — activity with no cause is what makes a sync client look broken.
+    func rebuildingIndex() {
+        post(
+            SyncNotification(
+                title: "Rebuilding sync index…",
+                body: "Auster is comparing your Dropbox folder with Dropbox again. Nothing will be lost."
+            )
+        )
+    }
+
     // MARK: - Delivery
 
     private func post(_ notification: SyncNotification?) {

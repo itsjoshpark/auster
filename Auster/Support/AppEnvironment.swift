@@ -42,6 +42,17 @@ final class AppEnvironment {
     /// disable the controls that would start a second one.
     private(set) var isBusy = false
 
+    /// `true` once Dropbox has rejected the token: only a browser can fix that,
+    /// so the menu carries the invitation rather than a modal (engine-doc §9).
+    private(set) var needsRelink = false
+
+    /// Guards against stacking dialogs: a fatal error that persists would
+    /// otherwise raise a second alert behind the first.
+    private var isRecovering = false
+
+    private var sleepObservers: [any NSObjectProtocol] = []
+    private var hasSlept = false
+
     /// Called when Auster no longer has what it needs to sync and the wizard has
     /// to come back — which today means the user unlinked from Settings.
     ///
@@ -95,9 +106,128 @@ final class AppEnvironment {
     /// Brings the engine up over the current folder, without re-checking the
     /// link. Used where the account is known good and only the folder changed.
     private func restartSync() async {
-        guard let coordinator = buildCoordinator() else { return }
-        self.coordinator = coordinator
-        await coordinator.start()
+        adoptCoordinator()
+        await coordinator?.start()
+    }
+
+    /// Builds the object graph over the current folder without starting it.
+    ///
+    /// Separate from `restartSync` because a rebuild does not want the startup
+    /// sequence first: it is about to throw away everything that sequence would
+    /// have produced.
+    private func adoptCoordinator() {
+        guard coordinator == nil else { return }
+        coordinator = buildCoordinator()
+    }
+
+    // MARK: - Recovery (engine-doc §9)
+
+    /// Watches the status for a fatal error, and offers whatever the recovery
+    /// model says it should.
+    ///
+    /// `withObservationTracking` rather than a callback on `SyncState`: the
+    /// state object's job is to describe sync, not to know that somebody wants
+    /// to put a dialog on screen. The tracking is one-shot, so it re-arms itself
+    /// each time it fires.
+    func observeFatalErrors() {
+        withObservationTracking {
+            _ = state.status
+        } onChange: { [weak self] in
+            // `onChange` runs *before* the new value is in place, so the read
+            // has to happen on the next turn of the main actor.
+            Task { @MainActor in
+                self?.observeFatalErrors()
+                await self?.recoverIfNeeded()
+            }
+        }
+    }
+
+    private func recoverIfNeeded() async {
+        guard case .fatalError(let error) = state.status, !isRecovering else { return }
+        isRecovering = true
+        defer { isRecovering = false }
+
+        switch RecoveryModel.presentation(for: error) {
+        case .folderMissingDialog:
+            let choice = FatalErrorDialogs.askAboutMissingFolder(configuredFolder: dropboxFolderURL)
+            await perform(RecoveryModel.plan(for: choice, configuredFolder: dropboxFolderURL))
+
+        case .relinkPrompt:
+            // No dialog: the menu says so, and the fix needs a browser.
+            needsRelink = true
+
+        case .automaticReindex:
+            await perform([.rebuildIndex])
+
+        case .message(let message):
+            FatalErrorDialogs.report(message)
+        }
+    }
+
+    /// Carries out a recovery plan, in the order the model gave it.
+    private func perform(_ actions: [RecoveryModel.Action]) async {
+        isBusy = true
+        defer { isBusy = false }
+
+        for action in actions {
+            switch action {
+            case .adoptFolder(let url):
+                // The watcher and every path in the engine are built around one
+                // root, so adopting a different one means a new object graph.
+                await coordinator?.stopForQuit()
+                coordinator = nil
+                database = nil
+                settings.dropboxFolderURL = url
+
+            case .createFolder(let url):
+                try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+
+            case .rebuildIndex:
+                state.clearFatalError()
+                adoptCoordinator()
+                await coordinator?.rebuildIndex()
+
+            case .quit:
+                NSApp.terminate(nil)
+            }
+        }
+    }
+
+    /// Sends the user back through the browser after a revoked token.
+    func relink() {
+        auth?.beginLink()
+    }
+
+    // MARK: - Sleep and wake (ux §9)
+
+    /// Re-checks both sides after the machine wakes.
+    ///
+    /// Neither loop survives a sleep in any useful sense: the longpoll
+    /// connection is dead, and FSEvents owes nothing about what other devices
+    /// did in the meantime. Rather than wait for the longpoll to time out and
+    /// retry — which can be a minute or more, on the one occasion the user is
+    /// most likely to be looking — waking runs the same two cycles startup runs.
+    ///
+    /// `willSleep` is watched only so that a `didWake` without one is ignored.
+    func observeSleepAndWake() {
+        let center = NSWorkspace.shared.notificationCenter
+
+        sleepObservers.append(
+            center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) {
+                [weak self] _ in
+                MainActor.assumeIsolated { self?.hasSlept = true }
+            }
+        )
+        sleepObservers.append(
+            center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) {
+                [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.hasSlept else { return }
+                    self.hasSlept = false
+                    Task { await self.coordinator?.syncNow() }
+                }
+            }
+        )
     }
 
     /// Moves the Dropbox folder and points the engine at its new home (ux §4).
@@ -146,9 +276,15 @@ final class AppEnvironment {
             let outcome = await auth.handleRedirect(url: url)
             if let onboarding {
                 onboarding.handle(outcome)
-            } else if case .linked = outcome, coordinator == nil {
-                // Relinked from Settings rather than from the wizard.
-                await start()
+            } else if case .linked = outcome {
+                // Relinked from Settings, or after a revoked token.
+                needsRelink = false
+                state.clearFatalError()
+                if coordinator == nil {
+                    await start()
+                } else {
+                    await coordinator?.resume()
+                }
             }
         }
     }
@@ -277,10 +413,20 @@ final class AppEnvironment {
         let dropbox = dropboxFolderURL
         guard let service else { return nil }
 
+        let notifier = makeNotifier()
+
         do {
             try FileManager.default.createDirectory(at: dropbox, withIntermediateDirectories: true)
             let database = try SyncDatabase(path: Self.databasePath())
             self.database = database
+
+            if database.wasResetOnOpen {
+                // The file on disk was unusable and had to be recreated. Nothing
+                // is lost — the index is derivable from both sides — but the
+                // re-index that follows is long enough to be worth explaining
+                // rather than leaving as unexplained activity (engine-doc §9).
+                notifier.rebuildingIndex()
+            }
 
             let pathStore = PathStore(dropboxRoot: dropbox, database: database, service: service)
             let ignore = IgnoreFilter()
@@ -313,7 +459,7 @@ final class AppEnvironment {
                 state: state,
                 engine: engine,
                 monitor: monitor,
-                notifier: makeNotifier(),
+                notifier: notifier,
                 collector: collector,
                 connection: ConnectionMonitor()
             )

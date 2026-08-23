@@ -70,6 +70,12 @@ struct MenuBarView: View {
         MenuInfoRow(statusText, isProminent: true)
         ActivitySection(activity: state.activity)
 
+        // A revoked token is the one fatal error the user can fix themselves,
+        // and only through a browser (engine-doc §9).
+        if environment.needsRelink {
+            MenuRowButton("Please re-link Auster…") { environment.relink() }
+        }
+
         syncIssuesRow
 
         MenuRowButton(state.status == .paused ? "Resume Syncing" : "Pause Syncing") {

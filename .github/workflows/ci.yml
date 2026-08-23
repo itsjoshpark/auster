@@ -28,8 +28,11 @@ jobs:
 
       # The engine carries the bulk of the coverage and builds in seconds, so it
       # runs before the app: a failure here should not wait on an app build.
+      # The integration suite needs a real Dropbox account, which CI has no
+      # business holding credentials for; it is skipped by name here and run
+      # locally with AUSTER_INTEGRATION=1 (see Scripts/test.sh).
       - name: Test AusterCore
-        run: swift test --package-path AusterCore
+        run: swift test --package-path AusterCore --skip "IntegrationTests"
 
       - name: Build, analyze, and test the app
         run: >
