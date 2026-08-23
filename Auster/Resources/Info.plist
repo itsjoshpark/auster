@@ -32,6 +32,15 @@
 	<key>DropboxAppKey</key>
 	<string>$(DROPBOX_APP_KEY)</string>
 
+	<!-- Sparkle. The feed URL and the public EdDSA key are injected from
+	     Config/Shared.xcconfig. Automatic checks are driven from the "Check for
+	     updates" setting at runtime rather than declared here, so the app and
+	     the preference can never disagree. -->
+	<key>SUFeedURL</key>
+	<string>$(SU_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SU_PUBLIC_ED_KEY)</string>
+
 	<!-- OAuth redirect target. Dropbox requires the scheme to be the app key
 	     prefixed with "db-"; the key is injected from Config/Secrets.xcconfig. -->
 	<key>CFBundleURLTypes</key>

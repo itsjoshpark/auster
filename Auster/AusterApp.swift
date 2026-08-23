@@ -102,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         environment.observeFatalErrors()
         environment.observeSleepAndWake()
+        environment.observeUpdateCheckInterval()
 
         Task {
             await environment.start()
