@@ -174,7 +174,7 @@ persist cursor → next page. `.cursorReset` → clear cursor + full reindex.
 Excluded (by name or by user) events dropped; remote deletion of an excluded item
 removes it from the excluded set (§8).
 
-- [ ] TDD with MockDropboxService: initial index of nested tree (assert local
+- [x] TDD with MockDropboxService: initial index of nested tree (assert local
   tree + index count + cursor saved); interruption mid-pagination (cancel after
   page 1) resumes without re-downloading page-1 files (mock counts downloads);
   steady-state delta applies only changes; ordering (parent folders exist before

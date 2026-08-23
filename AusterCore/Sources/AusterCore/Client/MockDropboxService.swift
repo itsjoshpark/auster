@@ -93,6 +93,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     private var storedUsage = SpaceUsage(used: 0, allocated: 2_000_000_000)
     private var storedPageSize: Int?
     private var storedLongpollBackoff: Int?
+    private var storedReversesListingOrder = false
 
     public init() {}
 
@@ -122,6 +123,17 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     public var longpollBackoff: Int? {
         get { lock.withLock { storedLongpollBackoff } }
         set { lock.withLock { storedLongpollBackoff = newValue } }
+    }
+
+    /// Emits every page's entries back to front.
+    ///
+    /// Dropbox promises only that applying a page *in order* reproduces server
+    /// state — not that parents precede their children. Setting this proves the
+    /// engine's own ordering (engine-doc §4.3) is what puts folders first,
+    /// rather than the listing happening to arrive that way.
+    public var reversesListingOrder: Bool {
+        get { lock.withLock { storedReversesListingOrder } }
+        set { lock.withLock { storedReversesListingOrder = newValue } }
     }
 
     /// Routes called so far, in order — for asserting that a code path did (or
@@ -280,10 +292,11 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
                 return page(from: remaining, logPosition: logPosition, root: root, recursive: recursive)
 
             case .delta(let logPosition, let root, let recursive):
-                let delta = changeLog[logPosition...]
+                var delta = changeLog[logPosition...]
                     .filter { Self.isDescendant($0.pathLower, of: root, recursive: recursive) }
+                if storedReversesListingOrder { delta.reverse() }
                 return ListPage(
-                    entries: Array(delta),
+                    entries: delta,
                     cursor: makeCursor(.delta(logPosition: changeLog.count, root: root, recursive: recursive)),
                     hasMore: false
                 )
@@ -635,6 +648,7 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
         root: String,
         recursive: Bool
     ) -> ListPage {
+        let entries = storedReversesListingOrder ? entries.reversed() : entries
         guard let limit = storedPageSize, entries.count > limit else {
             return ListPage(
                 entries: entries,

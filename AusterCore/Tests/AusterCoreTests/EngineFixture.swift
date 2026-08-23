@@ -117,6 +117,21 @@ final class EngineFixture {
         return try await SyncItemEvent(remote: metadata, index: database, pathStore: pathStore)
     }
 
+    func makeEngine(
+        excludedItems: @escaping @Sendable () -> Set<String> = { [] },
+        events: SyncEngineEvents = SyncEngineEvents()
+    ) -> SyncEngine {
+        SyncEngine(
+            service: service,
+            database: database,
+            pathStore: pathStore,
+            hasher: hasher,
+            fileOps: fileOps,
+            excludedItems: excludedItems,
+            events: events
+        )
+    }
+
     func makeApplier(
         ownerName: String? = "Mock User",
         events: SyncEngineEvents = SyncEngineEvents()
