@@ -498,3 +498,20 @@ subtree semantics for the same reason.
 The clue worth remembering: the error disappeared without a history row being
 written. `recordHistory` ignores `.skipped` completions, so "issue cleared, no
 history" is the signature of an issue cleared by something that did not sync.
+
+### N41. The Sync Issues window opts out of external events (Phase 9 follow-up)
+On a fresh setup the Sync Issues window appeared by itself, uninvited, the
+moment the OAuth redirect came back — before the user had finished the wizard.
+Nothing calls `openWindow` for it outside the menu row, and there was no saved
+application state.
+
+The trigger is the open-URL event specifically: activating the app by other
+means does not do it, and sending the app a `db-<appkey>://` URL by hand
+reproduces it every time. SwiftUI answers an external event by presenting its
+first eligible `Window` scene so that something can receive it. Auster reads the
+redirect from the app delegate instead (N6), so no scene should volunteer —
+`handlesExternalEvents(matching: [])` says exactly that.
+
+`defaultLaunchBehavior(.suppressed)` sits alongside it and covers presentation
+at launch. It is *not* sufficient on its own: tried first, and the window still
+appeared on the redirect, which is what narrowed the trigger to external events.

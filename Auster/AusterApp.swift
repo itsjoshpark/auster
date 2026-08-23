@@ -27,10 +27,20 @@ struct AusterApp: App {
             SettingsView(environment: environment)
         }
 
+        // This window is opened from the menu and nowhere else (ux §6), and it
+        // takes two modifiers to hold SwiftUI to that. `handlesExternalEvents`
+        // with an empty set is the load-bearing one: the OAuth redirect arrives
+        // as an open-URL event, and SwiftUI answers one by presenting its first
+        // eligible `Window` scene so that something can receive it — Auster
+        // reads the redirect from the app delegate instead (note N6), so no
+        // scene should volunteer. `defaultLaunchBehavior(.suppressed)` covers
+        // the same window being offered at launch.
         Window("Sync Issues", id: SyncIssuesWindow.id) {
             SyncIssuesWindow(environment: environment)
         }
         .defaultSize(width: 560, height: 360)
+        .defaultLaunchBehavior(.suppressed)
+        .handlesExternalEvents(matching: [])
     }
 }
 
