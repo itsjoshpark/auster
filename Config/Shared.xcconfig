@@ -1,0 +1,48 @@
+// Shared.xcconfig — project-wide build settings for Auster.
+//
+// Every build configuration of every target uses this as its base
+// configuration. Target-specific settings live in the target's build
+// configuration in Auster.xcodeproj.
+
+// MARK: - Platform & language
+
+SDKROOT = macosx
+MACOSX_DEPLOYMENT_TARGET = 15.0
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_EMIT_LOC_STRINGS = NO
+
+// MARK: - Versioning
+
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+// MARK: - Hygiene
+
+ALWAYS_SEARCH_USER_PATHS = NO
+CLANG_ENABLE_OBJC_ARC = YES
+CLANG_ENABLE_MODULES = YES
+ENABLE_STRICT_OBJC_MSGSEND = YES
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+GCC_NO_COMMON_BLOCKS = YES
+DEAD_CODE_STRIPPING = YES
+
+// MARK: - Signing
+//
+// Auster is not sandboxed: a user-chosen sync folder plus full file access
+// make the App Sandbox impractical (decisions.md D2). Developer ID signing and
+// notarization are configured in Phase 10.
+
+ENABLE_APP_SANDBOX = NO
+CODE_SIGN_STYLE = Automatic
+
+// MARK: - Dropbox app key
+//
+// The real key is injected from the gitignored Config/Secrets.xcconfig (see
+// Secrets.xcconfig.template). It is empty here so the project builds without
+// it — the key is only needed at runtime, from Phase 2 onward. The include
+// comes last so Secrets.xcconfig wins when it exists.
+
+DROPBOX_APP_KEY =
+
+#include? "Secrets.xcconfig"
