@@ -61,7 +61,7 @@ public final class SyncState {
     /// to someone who deliberately paused would suggest it is about to start
     /// again.
     public var status: Status {
-        if account == nil { return .needsSetup }
+        if !isLinked { return .needsSetup }
         if let fatalError { return .fatalError(fatalError) }
         if isPaused { return .paused }
         if let syncingDetail { return .syncing(detail: syncingDetail) }
@@ -74,11 +74,14 @@ public final class SyncState {
 
     // MARK: - Stored
 
+    /// The linked account's profile, once it has been fetched. Distinct from
+    /// `isLinked`: a linked account that is offline has no profile yet.
     public private(set) var account: AccountInfo?
     public private(set) var activity: [ActivityItem] = []
     public private(set) var recentChanges: [HistoryEntry] = []
     public private(set) var syncErrors: [SyncErrorEntry] = []
 
+    private var isLinked = false
     private var fatalError: SyncFatalError?
     private var isPaused = false
     private var isConnected = true
@@ -88,9 +91,21 @@ public final class SyncState {
 
     // MARK: - Status inputs
 
-    /// `nil` when no account is linked, which returns the app to setup.
+    /// Whether credentials exist at all.
+    ///
+    /// Deliberately separate from `account`: the profile can only be fetched
+    /// online, and treating its absence as "not linked" would send a linked user
+    /// who happens to be offline back through the setup wizard.
+    public func setLinked(_ linked: Bool) {
+        isLinked = linked
+        if !linked { account = nil }
+    }
+
+    /// The fetched profile. Receiving one implies the account is linked; losing
+    /// it does not imply the opposite — only `setLinked(false)` does.
     public func setAccount(_ account: AccountInfo?) {
         self.account = account
+        if account != nil { isLinked = true }
     }
 
     public func setFatalError(_ error: SyncFatalError) {

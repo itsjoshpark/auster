@@ -125,9 +125,22 @@ struct SyncStateTests {
     @Test("Unlinking returns to needing setup")
     func unlinkingNeedsSetup() {
         let state = linked()
-        state.setAccount(nil)
+        state.setLinked(false)
 
         #expect(state.status == .needsSetup)
+        #expect(state.account == nil)
+    }
+
+    /// A linked account that cannot be reached has no profile yet. Treating that
+    /// as "not linked" would send the user back through the setup wizard every
+    /// time they opened their laptop on a train.
+    @Test("Being linked without a fetched profile is not needing setup")
+    func linkedButOfflineIsNotSetup() {
+        let state = SyncState()
+        state.setLinked(true)
+        state.setConnected(false)
+
+        #expect(state.status == .connecting)
     }
 
     // MARK: - Activity

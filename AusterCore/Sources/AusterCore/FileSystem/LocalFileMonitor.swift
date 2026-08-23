@@ -24,7 +24,7 @@ public final class LocalFileMonitor: @unchecked Sendable {
 
     /// The folder as the rest of the engine spells it — what `PathStore` and
     /// `LocalFileOperations` derive their URLs from.
-    private let root: URL
+    public let root: URL
 
     /// The same folder with every symlink resolved, which is the only spelling
     /// FSEvents ever uses.

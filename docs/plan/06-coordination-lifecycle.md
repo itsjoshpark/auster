@@ -74,7 +74,7 @@ Error funnel per engine-doc §2: connection → auto-pause+auto-resume; fatal �
 `state.status = .fatalError`, notify, stop loops; item errors → DB + state list,
 cycle continues.
 
-- [ ] TDD with mock service + temp dirs (fake longpoll returning scripted
+- [x] TDD with mock service + temp dirs (fake longpoll returning scripted
   sequences): startup order (recording mock asserts call order); longpoll
   changes triggers download; connection error flips to connecting and recovers
   when service healed; pause cancels loops and persists; resume replays startup;
