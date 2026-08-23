@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install swift-format
+        run: |
+          brew update
+          brew install swift-format
+
+      - name: Lint using swift-format
+        run: |
+          /opt/homebrew/bin/swift-format lint -s -p -r ./
+
+      # The engine carries the bulk of the coverage and builds in seconds, so it
+      # runs before the app: a failure here should not wait on an app build.
+      - name: Test AusterCore
+        run: swift test --package-path AusterCore
+
+      - name: Build, analyze, and test the app
+        run: >
+          xcodebuild clean analyze test
+          -project Auster.xcodeproj
+          -scheme Auster
+          -destination "platform=macOS"
+          -resultBundlePath TestResults.xcresult
+          CODE_SIGN_IDENTITY="-"
+          CODE_SIGNING_REQUIRED=YES
+          CODE_SIGNING_ALLOWED=YES
+
+      - name: Report test failures
+        if: failure()
+        run: |
+          [ -d TestResults.xcresult ] || exit 0
+          xcrun xcresulttool get test-results tests --path TestResults.xcresult --compact \
+            | python3 -c '
+          import json, sys
+
+          def walk(node, test=None):
+              if node.get("nodeType") == "Test Case":
+                  test = node.get("name")
+              if node.get("nodeType") == "Failure Message":
+                  where = node.get("sourceLocation", {})
+                  file = where.get("filePath", "?").split("/")[-1]
+                  line = where.get("lineNumber", "?")
+                  print("%s\n    %s\n    %s:%s" % (test, node.get("name"), file, line))
+              for child in node.get("children") or []:
+                  walk(child, test)
+
+          for node in json.load(sys.stdin).get("testNodes", []):
+              walk(node)
+          '
+
+      - name: Upload results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults.xcresult
