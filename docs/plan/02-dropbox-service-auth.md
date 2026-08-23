@@ -134,7 +134,7 @@ public enum ContentHasher {
   uneven chunk boundaries. (Phase 9's integration suite cross-checks against a
   real upload's server `contentHash`.) Commit.
 
-- [ ] `Retry.swift`: `func withRetry<T>(policy:operation:)` — exponential backoff
+- [x] `Retry.swift`: `func withRetry<T>(policy:operation:)` — exponential backoff
   + jitter; honors `.rateLimited(retryAfter:)` and longpoll `backoff`; max 10
   attempts for `.dataCorrupted`/`.tooManyWriteOperations`, no retry for
   `.notFound`/`.notAuthorized`/etc. TDD with a fake clock.
