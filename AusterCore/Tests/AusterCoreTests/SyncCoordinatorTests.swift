@@ -46,7 +46,9 @@ struct SyncCoordinatorTests {
         let coordinator: SyncCoordinator
         private let suiteName: String
 
-        init() throws {
+        /// `retryInterval` defaults high enough that the retry loop stays out of
+        /// every test that is not about it.
+        init(retryInterval: Duration = .seconds(60)) throws {
             root = URL(fileURLWithPath: NSTemporaryDirectory())
                 .appendingPathComponent("auster-coordinator-\(UUID().uuidString)")
             dropbox = root.appendingPathComponent("Dropbox", isDirectory: false)
@@ -92,7 +94,9 @@ struct SyncCoordinatorTests {
                     settleAfterChanges: .milliseconds(10),
                     uploadDebounce: .milliseconds(50),
                     reconnectBackoff: .milliseconds(20),
-                    loopFloor: .milliseconds(10)
+                    loopFloor: .milliseconds(10),
+                    retryInterval: retryInterval,
+                    retryBackoffCap: .milliseconds(400)
                 )
             )
         }
@@ -427,6 +431,93 @@ struct SyncCoordinatorTests {
 
         #expect(await MainActor.run { fixture.state.syncErrors.count == 1 })
         #expect(await fixture.coordinator.isRunning)
+        await fixture.coordinator.stopForQuit()
+    }
+
+    // MARK: - Retrying failed paths (§5)
+
+    @Test("A failed download is retried without waiting for another remote change")
+    func failedDownloadsAreRetriedWhileRunning() async throws {
+        let fixture = try await Fixture(retryInterval: .milliseconds(100))
+        try fixture.service.seedFile(at: "/bad.txt", contents: "recovered")
+        fixture.service.failNext(.download, with: .tooManyWriteOperations)
+
+        await fixture.coordinator.start()
+        try await waitUntil("the failure to be recorded") {
+            !fixture.notifier.failedItems.isEmpty
+        }
+
+        // Nothing changes on either side from here: only the retry can clear it.
+        try await waitUntil("the retry to land") {
+            await MainActor.run { fixture.localExists("/bad.txt") }
+        }
+        try await waitUntil("the issue to clear") {
+            await MainActor.run { fixture.state.syncErrors.isEmpty }
+        }
+        await fixture.coordinator.stopForQuit()
+    }
+
+    @Test("A failed upload is retried without waiting for another local change")
+    func failedUploadsAreRetriedWhileRunning() async throws {
+        let fixture = try await Fixture(retryInterval: .milliseconds(100))
+        try Data("mine".utf8).write(to: fixture.local("/mine.txt"))
+        fixture.service.failNext(.upload, with: .tooManyWriteOperations)
+
+        await fixture.coordinator.start()
+        try await waitUntil("the failure to be recorded") {
+            !fixture.notifier.failedItems.isEmpty
+        }
+
+        try await waitUntil("the retry to land") {
+            fixture.service.allEntries.contains { $0.pathLower == "/mine.txt" }
+        }
+        await fixture.coordinator.stopForQuit()
+    }
+
+    /// The sync-issues window already lists a standing failure. Saying it again
+    /// every time the retry loop comes round would make the retry worse than the
+    /// gap it closes.
+    @Test("A path that keeps failing is notified once, not once per retry")
+    func repeatedFailuresAreNotifiedOnce() async throws {
+        let fixture = try await Fixture(retryInterval: .milliseconds(50))
+        try fixture.service.seedFile(at: "/bad.txt", contents: "bad")
+        fixture.service.failNext(.download, with: .tooManyWriteOperations, times: 20)
+
+        await fixture.coordinator.start()
+        try await waitUntil("the failure to be recorded") {
+            !fixture.notifier.failedItems.isEmpty
+        }
+
+        // Long enough for several rounds, backoff included.
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(fixture.notifier.failedItems.count == 1)
+        await fixture.coordinator.stopForQuit()
+    }
+
+    /// A standing issue was reported when it happened. Relaunching is not news.
+    @Test("Issues carried over from the last run are not notified again")
+    func carriedOverIssuesAreNotRenotified() async throws {
+        let fixture = try await Fixture(retryInterval: .milliseconds(100))
+        let failure = DropboxServiceError.tooManyWriteOperations
+        try fixture.service.seedFile(at: "/bad.txt", contents: "bad")
+        try fixture.database.upsertSyncError(
+            SyncErrorEntry(
+                dbxPathLower: "/bad.txt",
+                dbxPath: "/bad.txt",
+                direction: .down,
+                title: "Could not download file",
+                message: failure.localizedDescription
+            )
+        )
+        fixture.service.failNext(.download, with: failure, times: 20)
+
+        await fixture.coordinator.start()
+        try await waitUntil("the startup retry to have run") {
+            fixture.service.recordedCalls.contains(.download)
+        }
+
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(fixture.notifier.failedItems.isEmpty)
         await fixture.coordinator.stopForQuit()
     }
 }

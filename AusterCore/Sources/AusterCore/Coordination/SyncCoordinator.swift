@@ -48,18 +48,28 @@ public actor SyncCoordinator {
         /// the loop into a spin.
         public var loopFloor: Duration
 
+        /// How long to leave a failed path alone before trying it again.
+        public var retryInterval: Duration
+
+        /// The ceiling `retryInterval` doubles towards while the failures stand.
+        public var retryBackoffCap: Duration
+
         public init(
             longpollTimeout: Int = 40,
             settleAfterChanges: Duration = .seconds(2),
             uploadDebounce: Duration = .seconds(1),
             reconnectBackoff: Duration = .seconds(5),
-            loopFloor: Duration = .milliseconds(200)
+            loopFloor: Duration = .milliseconds(200),
+            retryInterval: Duration = .seconds(60),
+            retryBackoffCap: Duration = .seconds(1800)
         ) {
             self.longpollTimeout = longpollTimeout
             self.settleAfterChanges = settleAfterChanges
             self.uploadDebounce = uploadDebounce
             self.reconnectBackoff = reconnectBackoff
             self.loopFloor = loopFloor
+            self.retryInterval = retryInterval
+            self.retryBackoffCap = retryBackoffCap
         }
     }
 
@@ -77,6 +87,11 @@ public actor SyncCoordinator {
     private var loops: Task<Void, Never>?
     private var pending: [RawFSEvent] = []
     private var lastEventAt: ContinuousClock.Instant?
+
+    /// The failures the user has already been told about, path → message. A
+    /// standing issue is retried on a loop, and notifying each attempt would
+    /// turn one problem into a stream of them.
+    private var notifiedErrors: [String: String] = [:]
 
     public init(
         service: DropboxService,
@@ -171,6 +186,8 @@ public actor SyncCoordinator {
             state.setPaused(false)
             state.clearFatalError()
         }
+        // Issues left by the last run were reported when they happened.
+        notifiedErrors = Self.messagesByPath((try? database.syncErrors()) ?? [])
         connection?.start()
 
         guard await runStartupSequence() else { return }
@@ -193,9 +210,10 @@ public actor SyncCoordinator {
                 state.setConnected(true)
             }
 
-            // 3. Paths that failed last time, fetched fresh.
+            // 3. Paths that failed last time. Only the download direction: the
+            //    catch-up scan below re-offers local work by itself.
             for error in try database.syncErrors() where error.direction == .down {
-                try await engine.fetchRemoteItem(dbxPathLower: error.dbxPathLower)
+                try await retry(error)
             }
 
             // 4. Folders the user re-selected but that were never fetched.
@@ -221,6 +239,7 @@ public actor SyncCoordinator {
                 group.addTask { await self?.longpollLoop() }
                 group.addTask { await self?.uploadLoop() }
                 group.addTask { await self?.connectionLoop() }
+                group.addTask { await self?.retryLoop() }
             }
         }
     }
@@ -436,6 +455,65 @@ public actor SyncCoordinator {
         }
     }
 
+    /// Tries the paths in `sync_errors` again, on a widening interval.
+    ///
+    /// Nothing else will. A download that failed for a local reason — a folder
+    /// the user made read-only, a disk that filled up — waits on a remote change
+    /// that is never coming, and an upload that failed waits on a file the user
+    /// has already finished editing. Without this loop both stand until the next
+    /// launch, which is where the startup sequence picks them up.
+    private func retryLoop() async {
+        var delay = tuning.retryInterval
+        var previous: Set<String> = []
+
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: delay)
+            } catch {
+                return
+            }
+
+            let errors = (try? database.syncErrors()) ?? []
+            guard !errors.isEmpty else {
+                delay = tuning.retryInterval
+                previous = []
+                continue
+            }
+
+            // A round that changed nothing is evidence the cause is not going
+            // away on its own; anything new earns the short interval back.
+            let current = Set(errors.map(\.dbxPathLower))
+            delay = current == previous ? min(delay * 2, tuning.retryBackoffCap) : tuning.retryInterval
+            previous = current
+
+            guard await retryAll(errors) else { return }
+        }
+    }
+
+    /// - Returns: whether it is safe to carry on, as the funnel decides it.
+    private func retryAll(_ errors: [SyncErrorEntry]) async -> Bool {
+        do {
+            for error in errors {
+                try await retry(error)
+            }
+            await finishCycle(notifyDownloads: true)
+            await markOnline()
+            return true
+        } catch {
+            return await handle(error)
+        }
+    }
+
+    /// One failed path, tried again by the route its direction takes: a download
+    /// is fetched out of band, an upload is re-offered to the watcher so that it
+    /// goes through the same debounce and batching a user's own edit does.
+    private func retry(_ error: SyncErrorEntry) async throws {
+        switch error.direction {
+        case .down: try await engine.fetchRemoteItem(dbxPathLower: error.dbxPathLower)
+        case .up: await engine.retryLocalItem(dbxPathCased: error.dbxPath)
+        }
+    }
+
     // MARK: - After a cycle
 
     /// Publishes what a cycle did: the lists the UI reads, and the notifications
@@ -449,7 +527,12 @@ public actor SyncCoordinator {
             notifier.notifyConflict(item.event)
         }
         for item in completed {
-            if case .failed(let error) = item.completion { notifier.notifyItemError(error) }
+            guard case .failed(let error) = item.completion else { continue }
+            // The same path failing the same way again is not new information;
+            // it is still listed as a sync issue either way.
+            guard notifiedErrors[error.dbxPathLower] != error.message else { continue }
+            notifiedErrors[error.dbxPathLower] = error.message
+            notifier.notifyItemError(error)
         }
         if notifyDownloads {
             // Only remote changes. Telling users about their own edits is noise.
@@ -467,6 +550,7 @@ public actor SyncCoordinator {
     private func refreshLists() async {
         let history = (try? database.recentHistory(limit: 30)) ?? []
         let errors = (try? database.syncErrors()) ?? []
+        notifiedErrors = Self.messagesByPath(errors)
         await MainActor.run {
             state.setRecentChanges(history)
             state.setSyncErrors(errors)
@@ -482,6 +566,10 @@ public actor SyncCoordinator {
 
     private func markOnline() async {
         await MainActor.run { state.setConnected(true) }
+    }
+
+    private static func messagesByPath(_ errors: [SyncErrorEntry]) -> [String: String] {
+        Dictionary(errors.map { ($0.dbxPathLower, $0.message) }, uniquingKeysWith: { _, last in last })
     }
 
     // MARK: - The error funnel (§2)
