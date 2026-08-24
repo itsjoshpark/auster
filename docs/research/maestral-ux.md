@@ -22,7 +22,9 @@ Auster: use SF Symbols with `MenuBarExtra`; keep icons template (auto dark/light
 ## 2. Menu structure (linked, steady state)
 
 Maestral's exact menu, top to bottom — Auster mirrors this in a `MenuBarExtra`
-(window style, so we can show richer rows for status/activity):
+(menu style: item 12 needs a real submenu, and menu items track state while the
+menu is open, so the richer-rows argument for window style did not hold — see
+decisions N42):
 
 1. **Open Dropbox Folder** — opens the local folder in Finder.
 2. **Launch Dropbox Website** — opens dropbox.com.

@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Auster's entry point.
 ///
-/// The app is a menu-bar-only agent (`LSUIElement`): a `MenuBarExtra` in window
-/// style, a `Settings` scene, and two ordinary windows for the things that do
+/// The app is a menu-bar-only agent (`LSUIElement`): a `MenuBarExtra` menu, a
+/// `Settings` scene, and two ordinary windows for the things that genuinely do
 /// not fit in a menu. All sync logic lives in `AusterCore`; this target only
 /// renders state and forwards user intent.
 @main
@@ -21,7 +21,7 @@ struct AusterApp: App {
         } label: {
             StatusIconLabel(environment: environment)
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
 
         Settings {
             SettingsView(environment: environment)

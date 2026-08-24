@@ -2,13 +2,16 @@ import AppKit
 import AusterCore
 import SwiftUI
 
-/// The menu bar window, top to bottom exactly as ux §2 lists it.
+/// The menu bar menu, top to bottom exactly as ux §2 lists it.
 ///
-/// A window-style `MenuBarExtra` rather than a real menu, because three of the
-/// rows are not menu items at all: the status line carries live progress rows,
-/// the recent-changes section is a disclosure of thirty entries, and the usage
-/// readout updates while it is open. What it costs is that every row has to be
-/// built to look like a menu item, which `MenuRowButton` below is for.
+/// A real menu rather than a window-style panel. The panel was chosen so that
+/// the status and activity rows could be richer than a menu item, but the rows
+/// ux §2 actually asks for are lines of text, and emulating a menu inside a
+/// window cost more than it bought: a hand-built hover highlight on every row,
+/// and a snooze "submenu" that was a pop-up button — it needed a click, opened
+/// downwards over the rows below, and drew its disclosure on the wrong side.
+/// `.menuBarExtraStyle(.menu)` gets all of that from AppKit, including a
+/// submenu that opens on hover (note N42).
 struct MenuBarView: View {
 
     @Bindable var environment: AppEnvironment
@@ -16,69 +19,50 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
-    @State private var isConfirmingRebuild = false
-
     private var state: SyncState { environment.state }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            MenuRowButton("Open Dropbox Folder") { environment.openDropboxFolder() }
-            MenuRowButton("Launch Dropbox Website") { environment.openDropboxWebsite() }
+        Button("Open Dropbox Folder") { environment.openDropboxFolder() }
+        Button("Launch Dropbox Website") { environment.openDropboxWebsite() }
 
-            if state.status == .needsSetup {
-                unlinkedRows
-            } else {
-                linkedRows
-            }
+        if state.status == .needsSetup {
+            unlinkedRows
+        } else {
+            linkedRows
+        }
 
-            Divider().padding(.vertical, 4)
-            MenuRowButton("Quit Auster", shortcutHint: "⌘Q") { quit() }
-                .keyboardShortcut("q")
-        }
-        .padding(6)
-        .frame(width: 300)
-        .confirmationDialog(
-            "Rebuild Auster's sync index?",
-            isPresented: $isConfirmingRebuild
-        ) {
-            Button("Rebuild") { Task { await environment.rebuildIndex() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(
-                """
-                Auster will compare every file with Dropbox again. This can take \
-                a while for a large Dropbox, and nothing is lost: where the two \
-                sides disagree, Auster keeps both as conflicted copies.
-                """
-            )
-        }
+        Divider()
+        Button("Quit Auster") { quit() }
+            .keyboardShortcut("q")
     }
 
     // MARK: - Linked (ux §2)
 
     @ViewBuilder
     private var linkedRows: some View {
-        Divider().padding(.vertical, 4)
+        Divider()
 
+        // A `Text` in a menu is a disabled item, which is what these rows are:
+        // Maestral's could not be clicked either.
         if let account = state.account {
-            MenuInfoRow(account.email)
+            Text(account.email)
         }
-        MenuInfoRow(state.usageText)
+        Text(state.usageText)
 
-        Divider().padding(.vertical, 4)
+        Divider()
 
-        MenuInfoRow(statusText, isProminent: true)
+        Text(statusText)
         ActivitySection(activity: state.activity)
 
         // A revoked token is the one fatal error the user can fix themselves,
         // and only through a browser (engine-doc §9).
         if environment.needsRelink {
-            MenuRowButton("Please re-link Auster…") { environment.relink() }
+            Button("Please re-link Auster…") { environment.relink() }
         }
 
         syncIssuesRow
 
-        MenuRowButton(state.status == .paused ? "Resume Syncing" : "Pause Syncing") {
+        Button(state.status == .paused ? "Resume Syncing" : "Pause Syncing") {
             Task {
                 if state.status == .paused {
                     await environment.resume()
@@ -88,32 +72,32 @@ struct MenuBarView: View {
             }
         }
 
-        MenuRowButton("Show Recent Changes…") {
+        Button("Show Recent Changes…") {
             openWindow(id: RecentChangesWindow.id)
             NSApp.activate(ignoringOtherApps: true)
         }
 
-        Divider().padding(.vertical, 4)
+        Divider()
 
         snoozeRows
 
-        MenuRowButton("Rebuild Index…") { isConfirmingRebuild = true }
+        Button("Rebuild Index…") { confirmRebuild() }
             .disabled(environment.isBusy)
 
-        Divider().padding(.vertical, 4)
+        Divider()
 
-        MenuRowButton("Settings…", shortcutHint: "⌘,") { openSettings() }
+        Button("Settings…") { openSettings() }
             .keyboardShortcut(",")
-        MenuRowButton("Check for Updates…") { environment.updater.checkForUpdates() }
+        Button("Check for Updates…") { environment.updater.checkForUpdates() }
             .disabled(!environment.updater.canCheckForUpdates)
     }
 
     @ViewBuilder
     private var syncIssuesRow: some View {
         if state.syncErrors.isEmpty {
-            MenuInfoRow("No Sync Issues")
+            Text("No Sync Issues")
         } else {
-            MenuRowButton("Show Sync Issues (\(state.syncErrors.count))…") {
+            Button("Show Sync Issues (\(state.syncErrors.count))…") {
                 openWindow(id: SyncIssuesWindow.id)
                 NSApp.activate(ignoringOtherApps: true)
             }
@@ -123,10 +107,12 @@ struct MenuBarView: View {
     @ViewBuilder
     private var snoozeRows: some View {
         if environment.settings.isSnoozed, let until = environment.settings.notificationsSnoozedUntil {
-            MenuInfoRow("Notifications snoozed until \(Self.time.string(from: until))")
-            MenuRowButton("Turn On Notifications") { environment.settings.turnOnNotifications() }
+            Text("Notifications snoozed until \(Self.time.string(from: until))")
+            Button("Turn On Notifications") { environment.settings.turnOnNotifications() }
         } else {
-            MenuRowMenu("Snooze Notifications") {
+            // Nested in a menu, this is a real submenu: it opens on hover, flies
+            // out to the side, and draws its own disclosure (ux §2 item 12).
+            Menu("Snooze Notifications") {
                 Button("For the next 30 minutes") { environment.settings.snoozeNotifications(for: 30 * 60) }
                 Button("For the next hour") { environment.settings.snoozeNotifications(for: 3600) }
                 Button("For the next 8 hours") { environment.settings.snoozeNotifications(for: 8 * 3600) }
@@ -138,12 +124,12 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var unlinkedRows: some View {
-        Divider().padding(.vertical, 4)
-        MenuInfoRow("Setting up…", isProminent: true)
+        Divider()
+        Text("Setting up…")
 
-        Divider().padding(.vertical, 4)
+        Divider()
         StartAtLoginRow()
-        MenuRowButton("Help Center") {
+        Button("Help Center") {
             NSWorkspace.shared.open(URL(string: "https://github.com/itsjoshpark/auster")!)
         }
     }
@@ -160,6 +146,27 @@ struct MenuBarView: View {
         case .paused: "Paused"
         case .fatalError(let error): error.errorDescription ?? "Sync stopped"
         }
+    }
+
+    /// Menu content is an `NSMenu`, not a view hierarchy, so a SwiftUI
+    /// confirmation dialog has nothing to attach itself to — the confirmation
+    /// ux §2 item 13 asks for is an alert (note N42).
+    private func confirmRebuild() {
+        let alert = NSAlert()
+        alert.messageText = "Rebuild Auster's sync index?"
+        alert.informativeText = """
+            Auster will compare every file with Dropbox again. This can take a \
+            while for a large Dropbox, and nothing is lost: where the two sides \
+            disagree, Auster keeps both as conflicted copies.
+            """
+        alert.addButton(withTitle: "Rebuild")
+        alert.addButton(withTitle: "Cancel")
+
+        // The app has no windows of its own to bring forward, and an alert from
+        // a background agent would otherwise open behind whatever is in front.
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task { await environment.rebuildIndex() }
     }
 
     /// Quitting stops the loops first; cursors and index rows are written as
@@ -181,117 +188,19 @@ struct MenuBarView: View {
 
 // MARK: - Rows
 
-/// A row that looks and highlights like a menu item.
+/// One in-flight transfer, as a line of text.
 ///
-/// `Button(...)` in a `.window`-style `MenuBarExtra` draws as a push button, so
-/// the whole menu would look like a form. This is the plain-styled equivalent,
-/// with the hover highlight AppKit menus have.
-struct MenuRowButton: View {
+/// A menu item cannot hold a progress bar, and ux §2 item 7 does not ask for
+/// one: it describes progress in words.
+enum ActivityLine {
 
-    private let title: String
-    private let shortcutHint: String?
-    private let action: () -> Void
-
-    @State private var isHovering = false
-    @Environment(\.isEnabled) private var isEnabled
-
-    init(_ title: String, shortcutHint: String? = nil, action: @escaping () -> Void) {
-        self.title = title
-        self.shortcutHint = shortcutHint
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Text(title)
-                Spacer(minLength: 8)
-                if let shortcutHint {
-                    Text(shortcutHint).foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .contentShape(.rect)
-            .background(
-                isHovering && isEnabled ? Color.accentColor.opacity(0.85) : .clear,
-                in: .rect(cornerRadius: 4)
-            )
-            .foregroundStyle(isHovering && isEnabled ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-    }
-}
-
-/// A submenu that looks like the rows around it (ux §2 item 12).
-///
-/// `Menu` on its own draws a bordered popup button, which reads as a control
-/// dropped into a menu rather than as a menu item with a submenu. The chrome is
-/// stripped and the label rebuilt to match `MenuRowButton`, down to the hover
-/// highlight and the trailing chevron; the submenu itself is left to the system,
-/// which is what makes it look standard.
-struct MenuRowMenu<Content: View>: View {
-
-    private let title: String
-    private let content: () -> Content
-
-    @State private var isHovering = false
-
-    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.content = content
-    }
-
-    var body: some View {
-        Menu {
-            content()
-        } label: {
-            HStack(spacing: 8) {
-                Text(title)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(isHovering ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .contentShape(.rect)
-            .background(
-                isHovering ? Color.accentColor.opacity(0.85) : .clear,
-                in: .rect(cornerRadius: 4)
-            )
-            .foregroundStyle(isHovering ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .onHover { isHovering = $0 }
-    }
-}
-
-/// A row that states something rather than doing something: the email, the
-/// usage, the status line. Disabled-looking on purpose — these are the rows
-/// Maestral's menu could not be clicked on either.
-struct MenuInfoRow: View {
-
-    private let text: String
-    private let isProminent: Bool
-
-    init(_ text: String, isProminent: Bool = false) {
-        self.text = text
-        self.isProminent = isProminent
-    }
-
-    var body: some View {
-        Text(text)
-            .foregroundStyle(isProminent ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    static func text(for item: ActivityItem) -> String {
+        let arrow = item.direction == .down ? "↓" : "↑"
+        let name = (item.dbxPath as NSString).lastPathComponent
+        // `total` is zero until the size is known. "0%" would read as stalled.
+        guard item.total > 0 else { return "\(arrow) \(name)" }
+        let percent = Int((item.fraction * 100).rounded())
+        return "\(arrow) \(name) — \(percent)%"
     }
 }
 
@@ -302,22 +211,7 @@ private struct ActivitySection: View {
 
     var body: some View {
         ForEach(activity.prefix(5)) { item in
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Image(systemName: item.direction == .down ? "arrow.down" : "arrow.up")
-                        .font(.caption2)
-                    Text((item.dbxPath as NSString).lastPathComponent)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                if item.total > 0 {
-                    ProgressView(value: item.fraction).controlSize(.mini)
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 1)
+            Text(ActivityLine.text(for: item))
         }
     }
 }
@@ -329,9 +223,6 @@ private struct StartAtLoginRow: View {
 
     var body: some View {
         Toggle("Start on Login", isOn: $isEnabled)
-            .toggleStyle(.checkbox)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
             .onChange(of: isEnabled) { _, newValue in
                 // The system is the source of truth: if it refuses, snap the
                 // switch back rather than lie about what will happen at login.
