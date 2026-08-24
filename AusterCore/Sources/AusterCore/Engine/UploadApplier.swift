@@ -1,18 +1,8 @@
 import Foundation
 
-/// Sends one local change to Dropbox (engine-doc §5.6).
-///
-/// The download direction can always fall back on a conflicted copy; this one
-/// cannot. A wrong delete here removes the authoritative copy of something,
-/// which is why so much of this file is about *declining* to act: a delete whose
-/// remote version we have never seen is skipped, a rename across the
-/// selective-sync boundary is turned into a local rename instead, and a name
-/// that would collide once Dropbox normalises it is moved aside before it can
-/// swallow its neighbour.
-///
-/// Two mechanisms carry the rest of the safety story, both from decisions D9:
-/// modified files upload with `.update(rev)` so a lost update is impossible, and
-/// deletes carry `parentRev` so the server refuses one based on a stale view.
+/// Sends one local change to Dropbox (engine-doc §5.6). Much of this file is
+/// about declining to act, since a wrong delete removes the authoritative copy.
+/// Modified files upload with `.update(rev)`, deletes carry `parentRev` (D9).
 struct UploadApplier: Sendable {
 
     let service: DropboxService
@@ -31,10 +21,8 @@ struct UploadApplier: Sendable {
     /// appended to forever must not block the queue behind it.
     static let stabilityAttempts = 10
 
-    /// Applies `event`, reporting what happened.
-    ///
-    /// - Returns: `.skipped` whenever the remote already says what we wanted it
-    ///   to, or a guard refused to act.
+    /// Applies `event`, reporting what happened. Returns `.skipped` whenever the
+    /// remote already says what we wanted it to, or a guard refused to act.
     @discardableResult
     func apply(_ event: SyncItemEvent) async throws -> SyncCompletion {
         if event.changeType == .removed {
@@ -89,14 +77,8 @@ struct UploadApplier: Sendable {
     }
 
     /// Whether a sibling would occupy the same Dropbox path once normalised, and
-    /// what to call the collision.
-    ///
-    /// Dropbox paths are case-insensitive and NFC-normalised, so two names a
-    /// case-sensitive volume keeps apart arrive as one remote file — and the
-    /// second upload would destroy the first. A volume that is itself
-    /// case-insensitive can never produce the situation, which is why this takes
-    /// the sibling list rather than reading the directory: the rule is testable
-    /// on any machine, while the situation is not reproducible on most.
+    /// what to call the collision. Takes the sibling list rather than reading the
+    /// directory, so the rule stays testable on a case-insensitive volume.
     static func normalizationCollision(for name: String, siblings: [String]) -> String? {
         let normalized = PathStore.normalize(name)
 
@@ -183,11 +165,9 @@ struct UploadApplier: Sendable {
         return .conflictedCopy
     }
 
-    /// Waits until two consecutive size samples agree.
-    ///
-    /// An editor writing a large file produces an event long before it has
-    /// finished; uploading then would commit a truncated version and only fix it
-    /// on the next change.
+    /// Waits until two consecutive size samples agree. An editor writing a large
+    /// file produces an event long before it has finished, and uploading then
+    /// would commit a truncated version.
     private func waitForStableSize(at localURL: URL) async throws {
         var previous = fileSize(at: localURL)
         for _ in 0..<Self.stabilityAttempts {
@@ -266,10 +246,8 @@ struct UploadApplier: Sendable {
     }
 
     /// Removes whatever occupies the move's destination, since Dropbox's move
-    /// refuses to overwrite.
-    ///
-    /// Guarded by `parentRev` and best-effort: if the server declines, the move
-    /// autorenames instead, which is the safe outcome (D9.5).
+    /// refuses to overwrite. Guarded by `parentRev` and best-effort: if the
+    /// server declines, the move autorenames instead, which is safe (D9.5).
     private func clearMoveDestination(_ event: SyncItemEvent) async throws {
         guard let occupant = try database.indexEntry(forPathLower: event.dbxPathLower) else { return }
         do {
@@ -285,11 +263,9 @@ struct UploadApplier: Sendable {
         }
     }
 
-    /// Re-indexes what the move produced.
-    ///
-    /// A folder move relocates an entire subtree in one call, so the index for
-    /// every descendant is rebuilt from the remote rather than guessed at — none
-    /// of those children were uploaded, and their paths all just changed.
+    /// Re-indexes what the move produced. A folder move relocates a whole subtree
+    /// in one call, so every descendant's index row is rebuilt from the remote
+    /// rather than guessed at.
     private func indexMoved(_ moved: RemoteMetadata, event: SyncItemEvent) async throws {
         if let file = moved.asFile {
             try indexFile(file, at: file.pathDisplay, symlinkTarget: event.symlinkTarget)

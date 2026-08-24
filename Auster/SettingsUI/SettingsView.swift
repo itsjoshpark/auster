@@ -1,10 +1,7 @@
 import AusterCore
 import SwiftUI
 
-/// The Settings scene (ux §4).
-///
-/// Maestral used one long window of sections; Auster uses the native tabbed
-/// `Settings` scene with the same content, reorganized so that the two
+/// The Settings scene (ux §4). The native tabbed scene, organized so the two
 /// destructive controls — moving the folder and unlinking — are not next to the
 /// switches nobody thinks twice about.
 struct SettingsView: View {

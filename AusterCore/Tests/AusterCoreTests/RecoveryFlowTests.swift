@@ -4,12 +4,8 @@ import Testing
 @testable import AusterCore
 
 /// What Auster offers when sync has stopped, and what each answer does
-/// (engine-doc §9, ux §9).
-///
-/// These are the paths a user only ever meets on their worst day, which is
-/// exactly why the decisions are a pure function rather than something spread
-/// through a dialog's button handlers: the order of "adopt the folder, *then*
-/// rebuild" is a correctness property, not a UI detail.
+/// (engine-doc §9, ux §9). The order of "adopt the folder, then rebuild" is a
+/// correctness property, not a UI detail.
 @Suite("Recovery flows")
 struct RecoveryFlowTests {
 

@@ -4,17 +4,9 @@ import Testing
 
 @testable import Auster
 
-/// Where the composer's inputs are read from.
-///
-/// `AppEnvironment.makeNotifier` builds a `NotificationComposer` whose closures
-/// read `@MainActor` state — the linked account, the snooze — through
-/// `MainActor.assumeIsolated`. `SyncNotifying` is called from the coordinator's
-/// actor, so if composition happens on the caller's executor those closures run
-/// off the main actor and `assumeIsolated` traps the process.
-///
-/// That is not hypothetical: it crashed the app at the end of the first download
-/// cycle of a fresh setup, every time, with
-/// `dispatch_assert_queue_fail` under `NotificationComposer.downloadBatch`.
+/// The composer's closures read `@MainActor` state through
+/// `MainActor.assumeIsolated`, and `SyncNotifying` is called from the
+/// coordinator's actor, so composing on the caller's executor traps.
 @Suite("NotificationManager isolation")
 struct NotificationManagerIsolationTests {
 
@@ -28,10 +20,9 @@ struct NotificationManagerIsolationTests {
         }
     }
 
-    /// Suppressing change notifications is enough to exercise composition —
-    /// `downloadBatch` reads the suppression closure first and returns `nil`,
-    /// so nothing is ever handed to `UNUserNotificationCenter` and no
-    /// permission prompt appears.
+    /// Suppressing change notifications is enough: `downloadBatch` reads the
+    /// suppression closure first, so nothing reaches `UNUserNotificationCenter`
+    /// and no permission prompt appears.
     private func makeManager(_ recorder: Recorder) -> NotificationManager {
         NotificationManager(
             composer: NotificationComposer(

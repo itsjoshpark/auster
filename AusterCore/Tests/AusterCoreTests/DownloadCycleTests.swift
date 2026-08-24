@@ -3,13 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The whole remote → local half of the engine, driven end to end against the
-/// in-memory Dropbox (engine-doc §4.1, §4.3, §1.5).
-///
-/// These are the acceptance tests of design §6: the unit tests pin individual
-/// rules, and these check that a cycle composed of them mirrors a real account —
-/// including the cases where it is interrupted, reset, or asked to leave part of
-/// the remote alone.
+/// The remote → local half of the engine, end to end against the in-memory
+/// Dropbox (design §6): a cycle composed of the individual rules mirrors a real
+/// account, including when interrupted, reset, or partly excluded.
 @Suite("DownloadCycle")
 struct DownloadCycleTests {
 

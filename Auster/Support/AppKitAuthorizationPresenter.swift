@@ -2,11 +2,9 @@ import AppKit
 import AusterCore
 import Foundation
 
-/// Puts the Dropbox authorization page in front of the user.
-///
-/// This is the whole of the app target's involvement in linking: `AusterCore`
-/// runs the OAuth flow but cannot import AppKit, so opening a URL and showing an
-/// alert are delegated here (decisions N5).
+/// Puts the Dropbox authorization page in front of the user — the whole of the
+/// app target's involvement in linking. `AusterCore` runs the OAuth flow but
+/// cannot import AppKit, so opening a URL is delegated here (decisions N5).
 @MainActor
 final class AppKitAuthorizationPresenter: AuthorizationPresenter {
 

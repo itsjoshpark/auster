@@ -1,15 +1,9 @@
 import CoreServices
 import Foundation
 
-/// Watches the local Dropbox folder and reports what the *user* changed
-/// (engine-doc §5.1).
-///
-/// Everything the engine itself writes is filtered out on the way through, so
-/// the stream a consumer sees is already free of echoes. What remains is
-/// deliberately imprecise: FSEvents coalesces, batches, and can tag one entry
-/// created *and* modified *and* renamed at once, so the monitor picks the most
-/// useful single reading of each entry — checking the disk whenever the flags
-/// are ambiguous — and leaves the reconciling to the cleaning stage (§5.3).
+/// Watches the local Dropbox folder and reports what the user changed
+/// (engine-doc §5.1). Echoes are filtered out on the way through; what remains
+/// is imprecise, and the cleaning stage (§5.3) reconciles it.
 public final class LocalFileMonitor: @unchecked Sendable {
 
     /// How long FSEvents may batch before delivering. Short, because the upload
@@ -37,11 +31,9 @@ public final class LocalFileMonitor: @unchecked Sendable {
     private var stream: FSEventStreamRef?
 
     public init(root: URL, ignore: IgnoreFilter) {
-        // Two spellings of one folder, both needed. FSEvents only ever reports
-        // fully resolved paths (`/private/var/…`, never `/var/…`), while the
-        // engine declares its own mutations in the unresolved form it was
-        // configured with. Every incoming path is translated from the first into
-        // the second, so the ignore filter is comparing like with like.
+        // Two spellings of one folder, both needed: FSEvents reports fully
+        // resolved paths while the engine declares its mutations unresolved, so
+        // every incoming path is translated before the ignore filter sees it.
         self.root = root.standardizedFileURL
         self.resolvedRoot = Self.fullyResolved(root)
         self.ignore = ignore
@@ -71,10 +63,9 @@ public final class LocalFileMonitor: @unchecked Sendable {
             copyDescription: nil
         )
 
-        // `FileEvents` gives per-item rather than per-directory reporting;
-        // `NoDefer` delivers the first event of a burst immediately;
-        // `WatchRoot` is how a renamed or deleted Dropbox folder is noticed
-        // at all (§9).
+        // `FileEvents` gives per-item reporting; `NoDefer` delivers the first
+        // event of a burst immediately; `WatchRoot` is how a renamed or deleted
+        // Dropbox folder is noticed at all (§9).
         let flags = UInt32(
             kFSEventStreamCreateFlagUseCFTypes
                 | kFSEventStreamCreateFlagFileEvents
@@ -121,14 +112,9 @@ public final class LocalFileMonitor: @unchecked Sendable {
 
     // MARK: - Rescans (§4.4, §5.6)
 
-    /// Feeds a path back in as if the user had just produced it.
-    ///
-    /// The engine renames items behind the watcher's back — a conflicted copy, a
-    /// selective-sync rename — inside an ignore, which means the real events are
-    /// swallowed. Something has to put the result back into the queue or the new
-    /// file would sit there forever, never uploaded.
-    ///
-    /// These are synthetic by construction, so they bypass the ignore filter.
+    /// Feeds a path back in as if the user had just produced it. The engine
+    /// renames items inside an ignore, so the real events are swallowed and the
+    /// result would never be uploaded. Synthetic, so they bypass the filter.
     public func synthesizeRescan(of url: URL, index: SyncDatabase, pathStore: PathStore) {
         let target = url.standardizedFileURL
 
@@ -223,15 +209,9 @@ public final class LocalFileMonitor: @unchecked Sendable {
         continuation.yield(event)
     }
 
-    /// Whether the event concerns something Auster never syncs.
-    ///
-    /// Filtered here rather than downstream because the staging directory lives
-    /// *inside* the watched folder: every download writes, stamps and renames a
-    /// file in there, and all of that would otherwise arrive as local activity.
-    ///
-    /// A move is judged by where the item ended up — a file arriving out of
-    /// excluded space into the folder is a creation worth reporting, even though
-    /// its source was not.
+    /// Whether the event concerns something Auster never syncs. Filtered here
+    /// because the staging directory lives inside the watched folder. A move is
+    /// judged by where the item ended up, not where it came from.
     private func isExcluded(_ event: RawFSEvent) -> Bool {
         if case .moved(let destination) = event.kind {
             return isExcluded(destination)
@@ -254,13 +234,8 @@ public final class LocalFileMonitor: @unchecked Sendable {
     }
 
     /// Two adjacent rename entries are the two halves of one move when exactly
-    /// one of the paths is still on disk.
-    ///
-    /// Disk state rather than the event ids: the ids are an implementation
-    /// detail that has changed across releases, whereas "the source is gone and
-    /// the destination is there" is what a move actually *is*. When the shape
-    /// does not hold, both entries fall through to be decoded separately — the
-    /// cleaner turns that into a delete plus a create, which still converges.
+    /// one of the paths is still on disk — disk state rather than event ids.
+    /// Otherwise both fall through and the cleaner makes a delete plus a create.
     private func pairedMove(
         _ first: (path: String, flags: FSEventStreamEventFlags, id: FSEventStreamEventId),
         _ second: (path: String, flags: FSEventStreamEventFlags, id: FSEventStreamEventId)
@@ -280,11 +255,9 @@ public final class LocalFileMonitor: @unchecked Sendable {
         return nil
     }
 
-    /// The path with every symlink resolved and the `/private` prefix *kept*.
-    ///
-    /// `resolvingSymlinksInPath()` cannot be used here: it helpfully strips
-    /// `/private` again, which is the one part of the path FSEvents always
-    /// includes. `realpath(3)` is the only thing that agrees with the watcher.
+    /// The path with every symlink resolved and the `/private` prefix kept.
+    /// `resolvingSymlinksInPath()` strips `/private` again, which is the one part
+    /// FSEvents always includes, so `realpath(3)` is the only thing that agrees.
     private static func fullyResolved(_ url: URL) -> URL {
         guard let resolved = realpath(url.path, nil) else { return url.standardizedFileURL }
         defer { free(resolved) }
@@ -292,9 +265,7 @@ public final class LocalFileMonitor: @unchecked Sendable {
     }
 
     /// Translates a path FSEvents reported into the engine's own spelling of it.
-    ///
-    /// - Returns: `nil` for the watched folder itself and for anything outside
-    ///   it, neither of which is an item to sync.
+    /// Returns `nil` for the watched folder itself and for anything outside it.
     private func localURL(for path: String) -> URL? {
         // No `isDirectory:` inference: `URL(fileURLWithPath:)` stats the path and
         // appends a trailing slash for directories, which would make the URL of
@@ -314,11 +285,9 @@ public final class LocalFileMonitor: @unchecked Sendable {
             .reduce(root) { $0.appendingPathComponent($1, isDirectory: false) }
     }
 
-    /// The single most useful reading of a combined flag set.
-    ///
-    /// Disk state settles every ambiguity: a batch tagged created-and-removed
-    /// means something different depending on whether the file is there now, and
-    /// the flags alone cannot say which happened last.
+    /// The single most useful reading of a combined flag set. Disk state settles
+    /// the ambiguities: created-and-removed means different things depending on
+    /// whether the file is there now, and flags alone cannot say which was last.
     private static func kind(for flags: FSEventStreamEventFlags, at url: URL) -> RawFSEvent.Kind {
         guard FileManager.default.fileExists(atPath: url.path) else { return .deleted }
         if flags & UInt32(kFSEventStreamEventFlagItemCreated) != 0 { return .created }

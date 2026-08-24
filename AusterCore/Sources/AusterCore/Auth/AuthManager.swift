@@ -19,11 +19,8 @@ public enum LinkOutcome: Equatable, Sendable {
 }
 
 /// Owns whether Auster is linked to a Dropbox account, and the service that
-/// speaks for it.
-///
-/// The manager is deliberately thin: the SDK keeps the tokens, and the store
-/// keeps the SDK. What lives here is the part with consequences — refusing team
-/// accounts, and never leaving the app half-linked.
+/// speaks for it. Thin by design: what lives here is the part with consequences
+/// — refusing team accounts, and never leaving the app half-linked.
 @MainActor
 @Observable
 public final class AuthManager {
@@ -60,11 +57,9 @@ public final class AuthManager {
         store.beginAuthorization(scopes: Self.scopes)
     }
 
-    /// Consumes an OAuth redirect and decides what it means.
-    ///
-    /// Anything short of a linked personal account leaves the app unlinked, with
-    /// no credentials on disk: a half-linked state that the engine might later
-    /// act on is worse than making the user try again.
+    /// Consumes an OAuth redirect and decides what it means. Anything short of a
+    /// linked personal account leaves the app unlinked with no credentials on
+    /// disk: a half-linked state is worse than making the user try again.
     @discardableResult
     public func handleRedirect(url: URL) async -> LinkOutcome {
         switch await store.completeAuthorization(url: url) {
@@ -96,12 +91,9 @@ public final class AuthManager {
         }
     }
 
-    /// Re-establishes the link from stored credentials at launch.
-    ///
-    /// Being offline is not being unlinked: a connection failure keeps the link
-    /// and leaves `account` unread until the engine can reach Dropbox. Only a
-    /// token the server has rejected clears the link, because nothing but
-    /// re-linking will fix that.
+    /// Re-establishes the link from stored credentials at launch. Being offline
+    /// is not being unlinked, so only a token the server has rejected clears the
+    /// link — nothing but re-linking will fix that.
     public func restore() async {
         guard store.hasStoredCredentials, let service = store.makeService() else {
             discardLink()
@@ -126,10 +118,9 @@ public final class AuthManager {
         }
     }
 
-    /// Revokes the token server-side, then forgets it locally.
-    ///
-    /// The local credentials go regardless of whether the revoke call got
-    /// through — otherwise a user who unlinks while offline stays linked.
+    /// Revokes the token server-side, then forgets it locally. The local
+    /// credentials go regardless of whether the revoke got through, or a user
+    /// who unlinks while offline would stay linked.
     public func unlink() async {
         if let service {
             try? await service.revokeToken()

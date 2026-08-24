@@ -1,8 +1,6 @@
 import Foundation
 
-/// How hard to try again after a failure that might not repeat.
-///
-/// Dropbox asks clients to back off exponentially with jitter (api-notes §5).
+/// How hard to try again after a failure that might not repeat (api-notes §5).
 /// Jitter matters more than it looks: without it, a folder full of files that
 /// all fail at once would retry in lockstep forever.
 public struct RetryPolicy: Sendable, Equatable {
@@ -43,9 +41,8 @@ public struct RetryPolicy: Sendable, Equatable {
 }
 
 /// Where waiting happens, so tests can assert delays instead of enduring them.
-///
-/// The longpoll loop uses this too, for the server-supplied `backoff` that
-/// arrives in a longpoll response rather than in an error.
+/// The longpoll loop uses it too, for the server-supplied `backoff` that arrives
+/// in a longpoll response rather than in an error.
 public protocol RetrySleeper: Sendable {
     func sleep(for seconds: TimeInterval) async throws
 }
@@ -61,14 +58,8 @@ public struct SystemSleeper: RetrySleeper {
 }
 
 /// Runs `operation`, repeating it while it fails in a way that waiting might fix.
-///
-/// Only `DropboxServiceError`s the service layer marked retryable are repeated;
-/// everything else — including cancellation and errors from outside the service
-/// layer — propagates on the first attempt, because retrying a `notFound` or a
-/// `notAuthorized` just delays the real answer.
-///
-/// `randomFraction` is the source of jitter, in `0...1`. It is injectable so
-/// delays are deterministic under test.
+/// Only errors the service layer marked retryable are repeated. `randomFraction`
+/// is the source of jitter, injectable so delays are deterministic under test.
 public func withRetry<T>(
     policy: RetryPolicy = .standard,
     sleeper: any RetrySleeper = SystemSleeper(),
@@ -89,10 +80,9 @@ public func withRetry<T>(
     }
 }
 
-/// The wait before the attempt following `attempt`.
-///
-/// A rate limit carries the server's own answer, which is honored exactly and
-/// is not subject to `maxDelay` — the server knows better than the ceiling does.
+/// The wait before the attempt following `attempt`. A rate limit carries the
+/// server's own answer, which is honored exactly and is not subject to
+/// `maxDelay` — the server knows better than the ceiling does.
 private func delay(
     for error: DropboxServiceError,
     attempt: Int,

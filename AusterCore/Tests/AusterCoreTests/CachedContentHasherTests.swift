@@ -3,11 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// Hashing is the engine's most expensive local operation — every sync cycle
-/// asks "did this file change?" of every file — so the cache is what keeps a
-/// re-scan proportional to the changes rather than to the folder (engine-doc
-/// §1.2). These tests pin down when it may answer from memory and when it must
-/// go back to disk.
+/// Hashing is the engine's most expensive local operation, so the cache is what
+/// keeps a re-scan proportional to the changes rather than to the whole folder
+/// (engine-doc §1.2).
 @Suite("CachedContentHasher")
 struct CachedContentHasherTests {
 

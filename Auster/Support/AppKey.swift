@@ -1,12 +1,8 @@
 import Foundation
 
-/// Auster's Dropbox app key, injected at build time.
-///
-/// The key is not a cryptographic secret — OAuth uses PKCE, so no client secret
-/// ships in the app (decisions D3) — but it identifies Josh's developer-console
-/// entry, so it stays out of the repository: `Config/Secrets.xcconfig`
-/// (gitignored) defines `DROPBOX_APP_KEY`, `Info.plist` carries it through, and
-/// this reads it back.
+/// Auster's Dropbox app key, injected at build time. Not a cryptographic secret
+/// — OAuth uses PKCE (decisions D3) — but it identifies Josh's console entry, so
+/// gitignored `Config/Secrets.xcconfig` defines it and `Info.plist` carries it.
 enum AppKey {
 
     /// The value the committed template ships with, so a developer who has not

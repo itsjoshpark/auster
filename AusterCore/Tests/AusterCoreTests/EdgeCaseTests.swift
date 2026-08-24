@@ -3,12 +3,8 @@ import Testing
 
 @testable import AusterCore
 
-/// The long tail (engine-doc §9).
-///
-/// Every test here is a thing that happens to a real Dropbox eventually — an
-/// emoji in a filename, a file the user made read-only, a folder that filled up
-/// mid-download — and that a syncer either survives quietly or fails at in a way
-/// the user only notices much later.
+/// The long tail (engine-doc §9): things that happen to a real Dropbox
+/// eventually, and that a syncer either survives quietly or fails at invisibly.
 @Suite("Edge cases", .serialized)
 struct EdgeCaseTests {
 
@@ -101,9 +97,8 @@ struct EdgeCaseTests {
     // MARK: - The filesystem refusing
 
     /// A folder that cannot be written to is the shape every "disk full" and
-    /// "permission denied" failure arrives in: the item is recorded as a sync
-    /// issue, the rest of the cycle still lands, and nothing is left in the
-    /// staging directory (design §5).
+    /// "permission denied" failure arrives in: the item becomes a sync issue,
+    /// the rest of the cycle lands, and the staging directory is left clean.
     @Test("a file that cannot be written is recorded and does not stop the cycle")
     func unwritableDestinationBecomesASyncIssue() async throws {
         let fixture = try EngineFixture()
@@ -130,12 +125,8 @@ struct EdgeCaseTests {
     }
 
     /// Making a file read-only changes its ctime, which is indistinguishable
-    /// from editing it — so the engine treats it as an unsynced local change and
-    /// sets it aside rather than replacing it (engine-doc §4.4 rule 5).
-    ///
-    /// The point is not the conflicted copy but what it guarantees: a file the
-    /// user deliberately protected is never the thing a download overwrites, and
-    /// the permission bits go with it.
+    /// from editing it, so the engine sets it aside rather than replacing it
+    /// (engine-doc §4.4 rule 5). The permission bits go with it.
     @Test("a read-only file is set aside rather than overwritten by a remote update")
     func readOnlyFilesAreNeverOverwritten() async throws {
         let harness = try ScenarioHarness()
@@ -195,10 +186,9 @@ struct EdgeCaseTests {
         )
     }
 
-    /// The other direction has no equivalent: `files/upload` cannot create a
-    /// symlink, so a link the user makes locally goes up as its target's
-    /// content. What matters is that this is quiet and stable — no error, and
-    /// no second upload on the next pass.
+    /// `files/upload` cannot create a symlink, so a link made locally goes up as
+    /// its target's content. What matters is that this is quiet and stable: no
+    /// error, and no second upload on the next pass.
     @Test("a local symlink uploads as its target's content without looping")
     func localSymlinksUploadWithoutLooping() async throws {
         let harness = try ScenarioHarness()
@@ -222,10 +212,9 @@ struct EdgeCaseTests {
     }
     // MARK: - Waking up
 
-    /// Nothing that runs while the machine is awake was running while it slept:
-    /// the longpoll connection is dead and FSEvents owes us nothing about other
-    /// devices. Waking therefore re-checks both sides rather than trusting
-    /// either loop to notice (ux §9).
+    /// The longpoll is dead after sleep and FSEvents owes nothing about other
+    /// devices, so waking re-checks both sides rather than trusting either loop
+    /// to notice (ux §9).
     @Test("waking up re-checks both directions")
     func wakingRunsBothCycles() async throws {
         let fixture = try await SelectiveSyncFixture()

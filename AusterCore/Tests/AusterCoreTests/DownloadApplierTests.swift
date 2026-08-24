@@ -3,12 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// Applying one remote change to the disk (engine-doc §4.6–§4.8).
-///
-/// This is where the engine finally writes to the user's files, so the tests are
-/// written from the disk's point of view: what is on it afterwards, what
-/// survived, and what the index now claims. The conflict *decisions* are pinned
-/// in `ConflictResolverTests`; here it is their consequences that matter.
+/// Applying one remote change to the disk (engine-doc §4.6–§4.8), from the
+/// disk's point of view. The conflict decisions themselves are pinned in
+/// `ConflictResolverTests`.
 @Suite("DownloadApplier")
 struct DownloadApplierTests {
 

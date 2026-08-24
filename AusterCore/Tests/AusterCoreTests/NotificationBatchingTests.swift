@@ -3,12 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// What the user is told, and when (engine-doc §10, ux §8).
-///
-/// The rules here are mostly about restraint: a sync client that narrated every
-/// file would be unusable, and one that stayed quiet about a conflict would be
-/// untrustworthy. The composer is where that judgement lives, and it is pure so
-/// that it can be argued with in tests rather than in Notification Centre.
+/// What the user is told, and when (engine-doc §10, ux §8). The composer is pure
+/// so its restraint can be argued with in tests rather than in Notification
+/// Centre.
 @Suite("Notification composer")
 struct NotificationBatchingTests {
 

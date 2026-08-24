@@ -1,11 +1,7 @@
 #!/bin/bash
-#
 # bump-version.sh — print the next marketing version.
-#
 #   bump-version.sh 0.1.0 minor   ->  0.2.0
-#
-# Input may be two- or three-part, with or without a leading "v"; output is
-# always normalized to X.Y.Z.
+# Input may be two- or three-part, with or without "v"; output is always X.Y.Z.
 
 set -euo pipefail
 

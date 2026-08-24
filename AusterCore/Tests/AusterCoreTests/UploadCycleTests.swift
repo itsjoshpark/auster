@@ -4,11 +4,8 @@ import Testing
 @testable import AusterCore
 
 /// The local → remote half of a cycle, end to end (engine-doc §5.4–§5.5, §6).
-///
-/// The ordering assertions are the substantive ones: Dropbox has no transaction,
-/// so the sequence of calls *is* the correctness argument. Deletions go first
-/// because a create may need the name; parents go before children because a file
-/// cannot be uploaded into a folder that does not exist yet.
+/// Dropbox has no transaction, so the sequence of calls is the correctness
+/// argument: deletions first, parents before children.
 @Suite("UploadCycle")
 struct UploadCycleTests {
 
@@ -124,12 +121,9 @@ struct UploadCycleTests {
 
     // MARK: - Errors
 
-    /// One file Dropbox refuses must not abandon the rest of the batch.
-    ///
-    /// The two paths sit at different depths so the cycle sends them in
-    /// sequence, which is what makes "the *first* one fails" deterministic —
-    /// same-depth uploads run concurrently and would race for the injected
-    /// failure.
+    /// One file Dropbox refuses must not abandon the rest of the batch. The two
+    /// paths sit at different depths so the cycle sends them in sequence, which
+    /// is what makes "the first one fails" deterministic.
     @Test("A single failing upload becomes a sync issue and the cycle continues")
     func perPathFailureIsRecorded() async throws {
         let fixture = try EngineFixture()

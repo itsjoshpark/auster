@@ -1,13 +1,8 @@
 import Foundation
 
-/// Removes a throwaway `UserDefaults` suite, file included.
-///
+/// Removes a throwaway `UserDefaults` suite, file included:
 /// `removePersistentDomain(forName:)` empties the domain but leaves
-/// `~/Library/Preferences/<suite>.plist` on disk. With a suite per test that is
-/// about eleven empty plists per run: 680 of them, 2.7 MB, had accumulated in a
-/// developer's home directory by the time anyone looked. Tests clean up after
-/// themselves on the filesystem; there is no reason for preferences to be the
-/// exception.
+/// `~/Library/Preferences/<suite>.plist` behind, and there is a suite per test.
 func removeTestDefaults(suiteName: String) {
     UserDefaults.standard.removePersistentDomain(forName: suiteName)
 

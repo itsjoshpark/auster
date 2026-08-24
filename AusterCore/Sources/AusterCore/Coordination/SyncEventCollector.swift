@@ -2,15 +2,8 @@ import Foundation
 import Synchronization
 
 /// Gathers what a cycle completed, so it can be reported once at the end
-/// (engine-doc §10).
-///
-/// Notifications are batched per cycle — "Ada changed 12 files", not twelve
-/// notifications — which means something has to accumulate items while the cycle
-/// runs and hand them over when it finishes. The engine cannot: it does not know
-/// where a cycle's boundaries are relative to the user's attention, and its
-/// callbacks are fire-and-forget. The coordinator does, but it is built *after*
-/// the engine, which already needs its callbacks. This is the shared box that
-/// lets both exist.
+/// (engine-doc §10). The shared box that lets the engine accumulate items and
+/// the coordinator — built after it — hand them over when the cycle finishes.
 public final class SyncEventCollector: Sendable {
 
     private struct Storage {

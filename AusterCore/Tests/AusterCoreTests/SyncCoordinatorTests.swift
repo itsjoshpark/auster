@@ -3,14 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The always-on machinery: the startup sequence, the two worker loops, and what
-/// happens when any of it goes wrong (engine-doc §2, §3, §9).
-///
-/// The coordinator owns no sync logic — the engine has all of it — so what is
-/// tested here is *lifecycle*: that things happen in the right order, that a
-/// dropped connection is distinguishable from a user pause, that a fatal error
-/// stops the loops instead of spinning on them, and that quitting leaves nothing
-/// running.
+/// The always-on machinery: the startup sequence, the two worker loops, and
+/// what happens when any of it goes wrong (engine-doc §2, §3, §9). The
+/// coordinator owns no sync logic, so what is tested is lifecycle.
 @Suite("SyncCoordinator", .serialized)
 struct SyncCoordinatorTests {
 

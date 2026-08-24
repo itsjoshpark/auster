@@ -1,9 +1,8 @@
 import Foundation
 
 /// Namespace for constants shared across the engine and the app shell.
-///
-/// `AusterCore` is UI-free by design: it imports Foundation, CryptoKit and
-/// CoreServices only, never AppKit or SwiftUI.
+/// `AusterCore` is UI-free by design: Foundation, CryptoKit and CoreServices
+/// only, never AppKit or SwiftUI.
 public enum AusterCore {
 
     /// Bundle identifier of the shipping app. Used for keychain access groups,

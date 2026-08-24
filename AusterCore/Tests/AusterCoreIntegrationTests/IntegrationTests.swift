@@ -3,11 +3,8 @@ import Foundation
 import Testing
 
 /// The suite that checks Auster's model of Dropbox against Dropbox
-/// (api-notes §7).
-///
-/// Each test names the assumption it is defending. Where the same behaviour is
-/// simulated by `MockDropboxService`, the test says so — those are the ones that
-/// keep several hundred fast unit tests honest.
+/// (api-notes §7). Each test names the assumption it is defending; those the
+/// mock also simulates keep several hundred fast unit tests honest.
 @Suite(
     "Dropbox integration",
     .enabled(if: IntegrationHarness.isEnabled, IntegrationHarness.skipReason),
@@ -39,9 +36,8 @@ struct IntegrationTests {
     }
 
     /// Above 4 MiB the service switches to an upload session in chunks
-    /// (api-notes §6). `MockDropboxService` cannot tell the two paths apart
-    /// (implementation note N19), so this is the only place the chunked one is
-    /// exercised at all.
+    /// (api-notes §6). `MockDropboxService` cannot tell the two apart (note
+    /// N19), so this is the only place the chunked path is exercised.
     @Test("a 12 MiB file goes up through an upload session with its hash intact")
     func largeFileUsesUploadSession() async throws {
         let scope = try await IntegrationScope.make()
@@ -110,10 +106,8 @@ struct IntegrationTests {
     // MARK: - The safety guarantees (decisions D9)
 
     /// The single most important thing Auster relies on: an upload against a
-    /// revision the server has moved past does **not** overwrite, and does not
-    /// fail either — it writes a conflicted copy beside the original. This is
-    /// what makes a lost update impossible, and what `MockDropboxService`
-    /// simulates.
+    /// revision the server has moved past writes a conflicted copy beside the
+    /// original rather than overwriting it or failing.
     @Test("uploading against a stale rev produces a conflicted copy, not an overwrite")
     func staleRevUploadConflicts() async throws {
         let scope = try await IntegrationScope.make()

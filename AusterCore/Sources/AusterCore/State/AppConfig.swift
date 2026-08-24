@@ -19,21 +19,9 @@ public enum UpdateCheckInterval: String, Sendable, Codable, CaseIterable {
     }
 }
 
-/// The user's preferences, in `UserDefaults`.
-///
-/// Deliberately a thin façade rather than a stored model: every property reads
-/// and writes the defaults immediately, so two `AppConfig` values over the same
-/// suite can never disagree — which matters because the UI and the engine both
-/// hold one.
-///
-/// `excludedItems` is the exception worth knowing about: the *source of truth*
-/// for selective sync is the database (`StateKey.excludedItems`), because the
-/// engine must not depend on the UI's copy. What lives here is a mirror kept for
-/// the UI's convenience, written by the selective-sync operation alongside the
-/// database.
-///
-/// `@unchecked Sendable` because `UserDefaults` is documented as thread-safe but
-/// is not annotated as `Sendable`; nothing else here is mutable state.
+/// The user's preferences, in `UserDefaults`. A thin façade: every property
+/// reads and writes immediately, so two `AppConfig` values over one suite cannot
+/// disagree. `excludedItems` mirrors the database, which is the source of truth.
 public struct AppConfig: @unchecked Sendable {
 
     private let defaults: UserDefaults
@@ -54,10 +42,8 @@ public struct AppConfig: @unchecked Sendable {
     }
 
     /// The local Dropbox folder, or `nil` before onboarding has chosen one.
-    ///
-    /// Stored as a plain path rather than as bookmark data: the app is
-    /// unsandboxed (decisions D2), so it needs no security scope, and a path
-    /// stays readable and repairable if the folder is moved.
+    /// A plain path rather than bookmark data: the app is unsandboxed (D2), and a
+    /// path stays readable and repairable if the folder is moved.
     public var dropboxFolderURL: URL? {
         get {
             defaults.string(forKey: Key.dropboxFolderPath).map { URL(fileURLWithPath: $0) }

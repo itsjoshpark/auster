@@ -1,15 +1,7 @@
 #!/bin/bash
-#
 # project-version.sh — read and write Auster's version settings.
-#
-#   project-version.sh read-marketing Config/Shared.xcconfig
-#   project-version.sh read-build     Config/Shared.xcconfig
-#   project-version.sh write          Config/Shared.xcconfig 0.2.0 214
-#
-# MARKETING_VERSION and CURRENT_PROJECT_VERSION live in Config/Shared.xcconfig,
-# which every configuration of every target uses as its base — so each is
-# defined exactly once. A second definition would silently win over the first,
-# which is why finding one is an error rather than something to rewrite.
+#   read-marketing <file> | read-build <file> | write <file> <marketing> <build>
+# Both live in Config/Shared.xcconfig, defined once; a second one is an error.
 
 set -euo pipefail
 

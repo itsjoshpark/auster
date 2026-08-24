@@ -20,11 +20,8 @@ public enum AuthorizationResult: Equatable, Sendable {
 }
 
 /// Where Auster's Dropbox credentials live, and how a link is started and
-/// finished.
-///
-/// This exists so `AuthManager`'s decision-making — which is where a mistake
-/// costs the user something — is testable without a browser, a keychain or a
-/// network. `KeychainDropboxLinkStore` is the real one.
+/// finished. A protocol so `AuthManager`'s decisions are testable without a
+/// browser, a keychain or a network; `KeychainDropboxLinkStore` is the real one.
 @MainActor
 public protocol DropboxLinkStore: AnyObject {
 
@@ -46,11 +43,8 @@ public protocol DropboxLinkStore: AnyObject {
 }
 
 /// The real store: SwiftyDropbox's PKCE flow, with tokens in the macOS keychain.
-///
-/// It deliberately owns its own `DropboxOAuthManager` rather than going through
-/// `DropboxClientsManager`. The manager's `authorizedClient` is a mutable global
-/// that Swift 6 refuses to let us read (decisions N4), and an instance we own
-/// gives the same keychain-backed behaviour with none of that.
+/// It owns its own `DropboxOAuthManager` because `DropboxClientsManager`'s is a
+/// mutable global that Swift 6 refuses to let us read (decisions N4).
 @MainActor
 public final class KeychainDropboxLinkStore: DropboxLinkStore {
 

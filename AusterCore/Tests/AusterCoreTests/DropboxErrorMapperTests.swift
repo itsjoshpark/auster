@@ -4,13 +4,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The mapping from SwiftyDropbox's error unions to `DropboxServiceError` is
-/// where the engine's whole failure vocabulary comes from: get a case wrong and
-/// the engine retries something hopeless, or gives up on something transient.
-///
-/// Route errors arrive from the SDK inside a `Box` whose initializer is
-/// internal to the SDK, so those are asserted against
-/// `DropboxErrorMapper.mapRoute` directly — the same function `map` delegates to.
+/// The mapping from SwiftyDropbox's error unions to `DropboxServiceError`: a
+/// wrong case retries something hopeless, or gives up on something transient.
+/// Route errors go through `mapRoute`, whose `Box` the SDK keeps internal.
 @Suite("DropboxErrorMapper")
 struct DropboxErrorMapperTests {
 

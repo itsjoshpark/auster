@@ -1,12 +1,9 @@
 import Foundation
 import Network
 
-/// Reports whether the machine has a network path at all.
-///
-/// An accelerator, not a source of truth: the coordinator learns it is offline
-/// from the engine's own `.connection` failures, and would recover on its own by
-/// retrying. What this adds is *promptness* — knowing the moment Wi-Fi comes
-/// back rather than at the end of the next backoff.
+/// Reports whether the machine has a network path at all. An accelerator, not a
+/// source of truth: the coordinator learns it is offline from the engine's own
+/// failures, and this only makes recovery prompt.
 public protocol ConnectionMonitoring: Sendable {
 
     /// `true` when a network path exists. The first value is the current state.

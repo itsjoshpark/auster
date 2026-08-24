@@ -3,11 +3,8 @@ import Testing
 
 @testable import Auster
 
-/// The menu bar icon's state mapping (ux §1).
-///
-/// Worth its own tests because the icon is the only part of Auster most users
-/// look at: it is the whole status report for someone who never opens the menu,
-/// and a wrong glyph is a wrong answer to "is my work backed up?".
+/// The menu bar icon's state mapping (ux §1). The icon is the whole status
+/// report for someone who never opens the menu.
 @Suite("Status icon")
 struct StatusIconTests {
 

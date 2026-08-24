@@ -3,12 +3,8 @@ import Testing
 
 @testable import Auster
 
-/// Moving the Dropbox folder (ux §4).
-///
-/// The one settings control that touches every file the user has, so it is
-/// tested rather than trusted: what matters is that it refuses in the cases
-/// where finishing would merge two folders together, and that a refusal leaves
-/// both sides exactly as they were.
+/// Moving the Dropbox folder (ux §4): it must refuse where finishing would merge
+/// two folders together, and a refusal must leave both sides as they were.
 @Suite("Folder mover")
 struct FolderMoverTests {
 

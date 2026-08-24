@@ -1,12 +1,8 @@
 import Foundation
 
-/// The set algebra behind selective sync (engine-doc §8).
-///
-/// Kept apart from the machinery that acts on it because the two fail in
-/// different ways: getting the arithmetic wrong silently syncs the wrong
-/// folders, while getting the *application* wrong touches the user's files. The
-/// arithmetic is pure, total, and exhaustively testable; `SyncCoordinator` owns
-/// the consequences.
+/// The set algebra behind selective sync (engine-doc §8). Kept apart from the
+/// machinery that acts on it: the arithmetic is pure and exhaustively testable,
+/// while `SyncCoordinator` owns the consequences for the user's files.
 public enum SelectiveSync {
 
     /// What changing the selection implies.
@@ -35,13 +31,8 @@ public enum SelectiveSync {
     }
 
     /// The canonical form of a requested selection: normalized paths, no root,
-    /// and no entry already covered by another.
-    ///
-    /// Minimality is not cosmetic. `Exclusions.isExcluded(byUser:excluded:)`
-    /// scans the whole set for every path the engine considers, and a set that
-    /// accumulated every descendant the user ever unchecked would grow without
-    /// bound. It also makes the delta below well-defined: two selections that
-    /// exclude the same files have the same canonical form.
+    /// and no entry already covered by another. Minimality bounds the set the
+    /// exclusion check scans, and makes the delta below well-defined.
     public static func normalized(_ items: Set<String>) -> Set<String> {
         // The root is not a path the user may exclude (ux §5): excluding it
         // would mean excluding the account, which is what unlinking is for.
@@ -57,11 +48,9 @@ public enum SelectiveSync {
         }
     }
 
-    /// What has to change to get from `current` to `requested`.
-    ///
-    /// Both sides are canonicalized first, so a delta is computed between
-    /// meanings rather than between spellings — asking to exclude a folder that
-    /// is already inside an excluded one is correctly a no-op.
+    /// What has to change to get from `current` to `requested`. Both sides are
+    /// canonicalized first, so the delta is between meanings rather than
+    /// spellings: excluding an already-excluded folder is a no-op.
     public static func delta(current: Set<String>, requested: Set<String>) -> Delta {
         let before = normalized(current)
         let after = normalized(requested)

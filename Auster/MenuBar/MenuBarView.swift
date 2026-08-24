@@ -2,10 +2,9 @@ import AppKit
 import AusterCore
 import SwiftUI
 
-/// The menu bar menu, top to bottom exactly as ux §2 lists it.
-///
-/// A real `NSMenu`: the snooze row is a genuine submenu, and the highlight, the
-/// disabled info rows and the shortcut column come from AppKit (note N42).
+/// The menu bar menu, top to bottom exactly as ux §2 lists it. A real `NSMenu`:
+/// the snooze row is a genuine submenu, and the highlight, the disabled info
+/// rows and the shortcut column come from AppKit (note N42).
 struct MenuBarView: View {
 
     @Bindable var environment: AppEnvironment
@@ -191,10 +190,8 @@ private struct UnlinkedRows: View {
 
 // MARK: - Rows
 
-/// One in-flight transfer, as a line of text.
-///
-/// A menu item cannot hold a progress bar, and ux §2 item 7 does not ask for
-/// one: it describes progress in words.
+/// One in-flight transfer, as a line of text. A menu item cannot hold a progress
+/// bar, and ux §2 item 7 does not ask for one: it describes progress in words.
 enum ActivityLine {
 
     static func text(for item: ActivityItem) -> String {

@@ -1,12 +1,8 @@
 import Foundation
 
-/// Relocating the local Dropbox folder (ux §4).
-///
-/// Deliberately conservative about what it will do. Everything the user has is
-/// inside the folder being moved, and the two ways this could go wrong — merging
-/// it into somebody else's folder, or moving it into itself — are both silent
-/// until it is far too late. So both are refused before a single file is
-/// touched, and the caller is left with the folder exactly where it was.
+/// Relocating the local Dropbox folder (ux §4). Conservative on purpose: merging
+/// it into somebody else's folder and moving it into itself are both silent
+/// until far too late, so both are refused before a single file is touched.
 enum FolderMover {
 
     enum MoveError: LocalizedError, Equatable {
@@ -33,10 +29,8 @@ enum FolderMover {
     }
 
     /// Moves `source` to `destination`, creating the parent directories on the
-    /// way.
-    ///
-    /// - Throws: `MoveError`, always — a `FileManager` error is wrapped so the
-    ///   caller has one thing to show in an alert.
+    /// way. Throws `MoveError` always — a `FileManager` error is wrapped so the
+    /// caller has one thing to show in an alert.
     static func move(from source: URL, to destination: URL) throws {
         let source = source.standardizedFileURL
         let destination = destination.standardizedFileURL

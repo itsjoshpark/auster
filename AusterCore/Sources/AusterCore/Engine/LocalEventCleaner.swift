@@ -1,33 +1,13 @@
 import Foundation
 
 /// Collapses a raw FSEvents batch into one intent per path (engine-doc §5.3).
-///
-/// Raw event streams do not describe what the user did; they describe what the
-/// filesystem saw. An editor "saving a file" writes a scratch file, unlinks the
-/// original, and renames the scratch into place — and macOS does not promise to
-/// report those in order. Replaying that literally against Dropbox would delete
-/// the user's file and upload a new one in its place, losing its revision
-/// history for a change that was only an edit.
-///
-/// The four stages of §5.3 run in order, and each depends on the last: moves are
-/// split so their two halves take part in the per-path collapse, the collapse
-/// reduces every path to a single intent, surviving halves are recombined into
-/// moves, and finally the children of a moved or deleted directory are dropped
-/// because their parent already accounts for them.
-///
-/// Everything is keyed lookups over dictionaries and sets: a batch of twenty
-/// thousand events is normal when a folder is dropped into the Dropbox, and this
-/// runs before any of it can start syncing.
+/// Replaying an editor's atomic save literally would delete the user's file and
+/// upload a new one, losing its revision history for what was only an edit.
 public enum LocalEventCleaner {
 
-    /// - Parameters:
-    ///   - events: the raw batch, in delivery order.
-    ///   - isExcluded: whether a path is outside sync, which stops a rename
-    ///     across that boundary being recombined into a move.
-    ///   - requestRescan: called for a path whose events cancelled out, so its
-    ///     real state can be read from disk instead of inferred.
-    /// - Returns: at most one event per path, in order of each path's first
-    ///   appearance in the batch.
+    /// `events` is the raw batch in delivery order; `isExcluded` stops a rename
+    /// across the sync boundary being recombined; `requestRescan` is called for a
+    /// path whose events cancelled out. At most one event per path comes back.
     public static func clean(
         _ events: [RawFSEvent],
         isExcluded: (URL) -> Bool,
@@ -150,13 +130,8 @@ public enum LocalEventCleaner {
     // MARK: - 3. Recombine moves
 
     /// Puts a split move back together, but only when both halves came through
-    /// the collapse untouched.
-    ///
-    /// Anything else means the batch held more than a rename — the destination
-    /// was written afterwards, the source was recreated — and the two halves are
-    /// then genuinely a deletion and a creation. A rename across the
-    /// selective-sync boundary is likewise left split: to Dropbox that is a
-    /// deletion on one side and nothing on the other.
+    /// the collapse untouched. Anything else means the batch held more than a
+    /// rename, and the two halves are genuinely a deletion and a creation.
     private static func recombineMoves(
         _ collapsed: [CollapsedPath],
         pairs: [String: String],
@@ -198,10 +173,8 @@ public enum LocalEventCleaner {
     // MARK: - 4. Prune children
 
     /// Drops the events a moved or deleted directory already accounts for.
-    ///
-    /// Moving a folder is one remote call that takes its whole subtree with it,
-    /// and deleting one is the same; leaving the children in would turn a single
-    /// API call into thousands, each of which would fail.
+    /// Moving or deleting a folder is one remote call that takes its whole
+    /// subtree with it; leaving the children in would make thousands that fail.
     private static func pruneChildren(_ events: [RawFSEvent]) -> [RawFSEvent] {
         var movedDirectories: [[String]: [String]] = [:]
         var deletedDirectories: Set<[String]> = []

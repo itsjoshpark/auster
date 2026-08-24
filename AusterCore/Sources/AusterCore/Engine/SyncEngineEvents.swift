@@ -19,12 +19,8 @@ public enum SyncCompletion: Sendable, Equatable {
 }
 
 /// What the engine tells the outside world while it works (engine-doc §10).
-///
-/// Callbacks rather than a stream because they are fire-and-forget status
-/// reporting: nothing the engine does depends on anyone listening, and a
-/// coordinator that falls behind must never be able to stall a transfer. Every
-/// closure defaults to a no-op, so a test or a headless cycle can ignore all of
-/// them.
+/// Callbacks rather than a stream: nothing the engine does depends on anyone
+/// listening, and a coordinator that falls behind must not stall a transfer.
 public struct SyncEngineEvents: Sendable {
 
     /// The status line: `"Syncing…"`, `"Indexing 1,204…"`, `"Up to date"`.

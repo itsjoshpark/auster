@@ -1,12 +1,8 @@
 import Foundation
 
 /// Every failure the sync engine has to reason about, named in the engine's own
-/// terms rather than the SDK's.
-///
-/// `LiveDropboxService` maps `CallError` and the per-route error unions onto
-/// these (api-notes §5); the engine and the retry policy switch on nothing else.
-/// Cases exist only where the engine reacts differently — anything it can only
-/// log and skip collapses into `.other`.
+/// terms rather than the SDK's (api-notes §5). Cases exist only where the engine
+/// reacts differently; anything it can only log and skip becomes `.other`.
 public enum DropboxServiceError: Error, Sendable, Equatable {
 
     /// Nothing at that path, and nothing ever was.
@@ -62,9 +58,8 @@ public enum DropboxServiceError: Error, Sendable, Equatable {
 extension DropboxServiceError {
 
     /// Whether waiting and repeating the same call could plausibly succeed.
-    ///
-    /// `Retry` uses this as its gate; it does not spell out the cases itself, so
-    /// a new case is classified once, here.
+    /// `Retry` gates on this rather than spelling out the cases itself, so a new
+    /// case is classified once, here.
     public var isRetryable: Bool {
         switch self {
         case .connection, .rateLimited, .tooManyWriteOperations, .dataCorrupted:

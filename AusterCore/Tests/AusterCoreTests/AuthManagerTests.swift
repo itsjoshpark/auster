@@ -3,10 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// Linking is the one place where a wrong answer is unrecoverable for the user:
-/// a team account that slips through would have the engine syncing against a
-/// namespace Auster does not understand (decisions D4). The outcome logic is
-/// therefore tested against a fake link store rather than a real OAuth flow.
+/// Linking is the one place where a wrong answer is unrecoverable: a team
+/// account that slipped through would have the engine syncing against a
+/// namespace Auster does not understand (decisions D4).
 @MainActor
 @Suite("AuthManager")
 struct AuthManagerTests {

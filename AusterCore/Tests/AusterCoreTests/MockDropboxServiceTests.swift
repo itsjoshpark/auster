@@ -564,11 +564,9 @@ private final class Reporter: @unchecked Sendable {
 
 // MARK: - Listing a folder that is not there
 
-/// Found by the Phase 9 integration suite running against the real API for the
-/// first time: the mock answered a listing of a folder that does not exist with
-/// an empty page, where Dropbox answers `path/not_found`. A folder that has been
-/// deleted remotely and one that is merely empty are not the same thing, and an
-/// engine tested only against the lenient answer never meets the strict one.
+/// The mock answers a listing of a folder that does not exist with
+/// `path/not_found`, as Dropbox does. A folder deleted remotely and one that is
+/// merely empty are not the same thing (note N39).
 @Suite("MockDropboxService listing errors")
 struct MockDropboxServiceListingTests {
 

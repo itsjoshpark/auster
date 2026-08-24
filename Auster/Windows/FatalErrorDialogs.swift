@@ -2,16 +2,8 @@ import AppKit
 import AusterCore
 
 /// The modal Auster shows when it cannot find the user's Dropbox folder
-/// (engine-doc §9, ux §9).
-///
-/// `NSAlert` rather than a SwiftUI sheet because there is nothing to attach a
-/// sheet to: Auster is a menu-bar agent, and at the moment this fires there may
-/// be no window on screen at all.
-///
-/// The wording matters as much as the buttons. A folder that has vanished is
-/// almost never a deletion — it is an unmounted drive, or a rename, or a move —
-/// and a dialog that implied Auster was about to delete anything would push
-/// people into the wrong answer.
+/// (engine-doc §9, ux §9). `NSAlert` because a menu-bar agent may have no window
+/// to attach a sheet to. The wording avoids implying anything will be deleted.
 @MainActor
 enum FatalErrorDialogs {
 

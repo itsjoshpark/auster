@@ -1,9 +1,7 @@
 #!/bin/bash
-#
 # append-appcast-item.sh — insert a new <item> at the top of the Sparkle
-# appcast, preserving the rest of the file byte for byte.
-#
-# The signature and length come from Sparkle's sign_update.
+# appcast, preserving the rest of the file byte for byte. The signature and
+# length come from Sparkle's sign_update.
 
 set -euo pipefail
 
@@ -67,9 +65,8 @@ done
 [[ -f "$notes" ]] || die "notes file not found: $notes"
 
 # Every value below is interpolated into XML, and a value like `1" x="2` yields
-# well-formed XML with a bogus attribute, so the well-formedness check at the end
-# would not catch it. Two-part versions are accepted so an older entry can be
-# amended by hand.
+# well-formed XML with a bogus attribute, which the final check would not catch.
+# Two-part versions are accepted so an older entry can be amended by hand.
 [[ "$build" =~ ^[0-9]+$ ]] || die "build must be a whole number, got '$build'"
 [[ "$length" =~ ^[0-9]+$ ]] || die "length must be a whole number, got '$length'"
 [[ "$version" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]] || die "version must be X.Y or X.Y.Z, got '$version'"
@@ -91,11 +88,9 @@ if grep -qF ']]>' "$notes"; then
     die "notes file contains ']]>', which would terminate the CDATA section: $notes"
 fi
 
-# Sparkle picks updates by CFBundleVersion. A build number that does not exceed
-# the newest entry is never offered, so refuse rather than publish a dud. An
-# empty feed has no newest entry, which is the first release.
-# `|| true` because an empty feed matches nothing, and a failing grep under
-# `set -o pipefail` would end the run without a word.
+# Sparkle picks updates by CFBundleVersion, so a build number that does not
+# exceed the newest entry is refused rather than published. `|| true` because an
+# empty feed matches nothing and would end the run under `set -o pipefail`.
 newest="$(grep -o '<sparkle:version>[0-9]*</sparkle:version>' "$appcast" |
     grep -o '[0-9]*' | sort -n | tail -1 || true)"
 if [[ -n "$newest" ]] && ((build <= newest)); then

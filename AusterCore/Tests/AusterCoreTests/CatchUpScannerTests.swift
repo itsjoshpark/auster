@@ -3,13 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// Finding out what happened while Auster was not running (engine-doc §6).
-///
-/// A full walk of the folder diffed against the index. The dangerous half is the
-/// deletions: everything the index knows but the disk does not looks like a
-/// deletion, including the case where the *folder itself* is missing — so the
-/// root guard runs first, and a missing folder throws rather than producing a
-/// deletion for every file the user owns (§9).
+/// Finding out what happened while Auster was not running (engine-doc §6). The
+/// dangerous half is deletions: a missing folder would produce one for every
+/// file the user owns, so the root guard runs first (§9).
 @Suite("CatchUpScanner")
 struct CatchUpScannerTests {
 

@@ -1,19 +1,9 @@
 import Foundation
 import SwiftyDropbox
 
-/// The real Dropbox, behind `DropboxService`.
-///
-/// Everything SDK-shaped stops here: callbacks become `async`, `CallError`
-/// becomes `DropboxServiceError`, `Files.Metadata` becomes `RemoteMetadata`, and
-/// transient failures are absorbed by `withRetry` so callers see one call's
-/// worth of outcome (api-notes §5).
-///
-/// Concurrency: this is a plain `final class` with immutable state and no actor
-/// isolation on purpose. `DropboxClient` and the SDK's model types are not
-/// `Sendable`, so every SDK value is created, awaited and converted inside one
-/// non-isolated method — nothing SDK-shaped ever crosses an isolation boundary.
-/// The client itself is safe to call concurrently (it owns a `URLSession`), so
-/// the `@unchecked Sendable` is on the reference, not on shared mutable state.
+/// The real Dropbox, behind `DropboxService`. Everything SDK-shaped stops here
+/// (api-notes §5). Every SDK value is created, awaited and converted inside one
+/// non-isolated method, so nothing unsendable crosses an isolation boundary.
 public final class LiveDropboxService: DropboxService, @unchecked Sendable {
 
     private let client: DropboxClient
@@ -135,8 +125,7 @@ public final class LiveDropboxService: DropboxService, @unchecked Sendable {
 
             // The SDK writes the file itself, so the hash is checked on the
             // written bytes rather than mid-stream. A file that fails is deleted
-            // before throwing, so a partial download is never left staged for
-            // the atomic move (decisions D9.3).
+            // before throwing, so nothing partial is left staged (D9.3).
             if let expected = metadata.contentHash {
                 let actual = try ContentHasher.hash(fileAt: localURL)
                 guard actual == expected else {
@@ -400,11 +389,9 @@ public final class LiveDropboxService: DropboxService, @unchecked Sendable {
         )
     }
 
-    /// Converts one SDK metadata value.
-    ///
-    /// Returns `nil` when Dropbox reports no path — which happens for entries
-    /// that are not mounted in this account's namespace. There is nothing the
-    /// engine could do with such an entry, so it is dropped from listings.
+    /// Converts one SDK metadata value. Returns `nil` when Dropbox reports no
+    /// path, which happens for entries not mounted in this account's namespace —
+    /// there is nothing the engine could do with one.
     private static func convert(_ metadata: Files.Metadata) -> RemoteMetadata? {
         guard let pathLower = metadata.pathLower, let pathDisplay = metadata.pathDisplay else {
             return nil

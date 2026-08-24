@@ -1,12 +1,7 @@
 #!/bin/bash
-#
 # render-notes.sh — render Markdown release notes as an HTML fragment.
-#
 #   render-notes.sh .sparkle/notes/next.md  ->  <ul>\n<li>New: …</li>\n</ul>
-#
-# The output goes on stdout, indented to sit inside the appcast's
-# <description> CDATA. GitHub gets the same file as Markdown, so both
-# destinations read the same — cmark-gfm is GitHub's own implementation.
+# Output is indented to sit inside the appcast's <description> CDATA.
 
 set -euo pipefail
 
@@ -24,9 +19,8 @@ command -v cmark-gfm >/dev/null ||
     die "cmark-gfm is not installed. Run: brew install cmark-gfm"
 
 # The extensions GitHub itself renders, so a table is a table in both places.
-# Footnotes are left off: they emit valueless attributes, which are HTML but not
-# XML. Without --unsafe, raw HTML becomes a placeholder comment rather than
-# passing through, which is how the tag check below catches it.
+# Footnotes are left off: they emit valueless attributes, HTML but not XML.
+# Without --unsafe, raw HTML becomes a placeholder the tag check below catches.
 html="$(cmark-gfm --to html \
     --extension table --extension tasklist \
     --extension strikethrough --extension autolink "$notes")" ||

@@ -3,13 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The setup wizard's state machine (ux §3).
-///
-/// Worth testing away from the window because it is the only part of Auster a
-/// user meets before they trust it with anything, and because two of its
-/// transitions are irreversible in opposite directions: finishing writes the
-/// folder the engine will treat as theirs, and cancelling throws away
-/// credentials that took a browser round trip to get.
+/// The setup wizard's state machine (ux §3). Two transitions are irreversible in
+/// opposite directions: finishing writes the folder the engine treats as theirs,
+/// cancelling throws away credentials that took a browser round trip.
 @MainActor
 @Suite("Onboarding model")
 struct OnboardingModelTests {

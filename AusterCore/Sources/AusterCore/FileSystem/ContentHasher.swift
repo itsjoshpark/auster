@@ -1,26 +1,17 @@
 import CryptoKit
 import Foundation
 
-/// Dropbox's `content_hash` (api-notes §4).
-///
-/// The file is cut into 4 MiB blocks, each block is SHA-256'd, the raw digests
-/// are concatenated, and that concatenation is SHA-256'd again. Comparing this
-/// against a `RemoteFile.contentHash` tells the engine whether a local file and
-/// a remote revision hold the same bytes without transferring anything — which
-/// is what keeps a re-index cheap.
-///
-/// Everything here streams. Sync folders routinely hold files larger than
-/// memory, so no entry point ever loads a whole file.
+/// Dropbox's `content_hash` (api-notes §4): 4 MiB blocks, each SHA-256'd, the
+/// digests concatenated and SHA-256'd again. Everything streams, because sync
+/// folders routinely hold files larger than memory.
 public enum ContentHasher {
 
     /// Dropbox's block size. Also the chunk size uploads use, so a session's
     /// per-chunk hashes line up with block boundaries (api-notes §6).
     public static let blockSize = 4 * 1024 * 1024
 
-    /// Hashes a file by streaming it.
-    ///
-    /// - Throws: whatever reading the file threw. A hash of the wrong bytes is
-    ///   worse than no hash, so this never falls back to a default.
+    /// Hashes a file by streaming it. Throws whatever reading it threw: a hash of
+    /// the wrong bytes is worse than no hash, so this never falls back.
     public static func hash(fileAt url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
@@ -40,10 +31,8 @@ public enum ContentHasher {
     }
 
     /// Accumulates the hash as bytes arrive, so a transfer can be verified while
-    /// it happens rather than by re-reading it afterwards.
-    ///
-    /// `finalize()` is non-mutating and repeatable: it works on a copy of the
-    /// in-progress block, so a caller can read the hash so far and keep going.
+    /// it happens. `finalize()` is non-mutating and repeatable, working on a copy
+    /// of the in-progress block.
     public struct Streaming: Sendable {
 
         /// Concatenated raw digests of the blocks completed so far.

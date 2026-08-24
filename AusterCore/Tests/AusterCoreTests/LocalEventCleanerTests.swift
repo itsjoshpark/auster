@@ -4,13 +4,8 @@ import Testing
 @testable import AusterCore
 
 /// Turning a raw FSEvents batch into one intent per path (engine-doc §5.3).
-///
-/// Raw streams are messy in a specific way: editors save atomically, so a single
-/// "save" arrives as a temp file created, the original unlinked, the temp
-/// renamed into place — and macOS does not promise to deliver those in order.
-/// Uploading that literally would delete the user's file and re-add it. These
-/// tests pin the collapse rules that turn the mess back into "this file was
-/// modified".
+/// Editors save atomically, so one save arrives as a temp created, the original
+/// unlinked and the temp renamed in — out of order.
 @Suite("LocalEventCleaner")
 struct LocalEventCleanerTests {
 

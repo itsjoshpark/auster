@@ -1,12 +1,8 @@
 import Foundation
 
-/// `ContentHasher` with the hash cache in front of it (engine-doc §1.2).
-///
-/// Every sync cycle asks whether each local file still matches its index entry,
-/// and answering that by reading every byte of every file would make a scan cost
-/// the size of the folder rather than the size of the change. The cache is keyed
-/// by inode — so a rename keeps its hash — and invalidated by mtime, which is
-/// what actually changes when the bytes do.
+/// `ContentHasher` with the hash cache in front of it (engine-doc §1.2), so a
+/// scan costs the size of the change rather than the size of the folder. Keyed
+/// by inode — a rename keeps its hash — and invalidated by mtime.
 public struct CachedContentHasher: Sendable {
 
     private let database: SyncDatabase
@@ -15,15 +11,9 @@ public struct CachedContentHasher: Sendable {
         self.database = database
     }
 
-    /// The content hash of whatever is at `localURL`.
-    ///
-    /// Returns `ItemType.folderSentinel` for a directory and `nil` when nothing
-    /// is there — including a symlink pointing at nothing, since the engine's
-    /// question is about content, and a broken link has none.
-    ///
-    /// Symlinks are followed: a link's content is its target's content, and the
-    /// fact that it *is* a link is recorded separately, in the index entry's
-    /// `symlinkTarget`.
+    /// The content hash of whatever is at `localURL`: `ItemType.folderSentinel`
+    /// for a directory, `nil` when nothing is there or a symlink dangles.
+    /// Symlinks are followed; the index entry records that it was one.
     public func localHash(at localURL: URL) throws -> String? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: localURL.path),
             let type = attributes[.type] as? FileAttributeType

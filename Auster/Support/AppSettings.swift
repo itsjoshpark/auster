@@ -2,18 +2,9 @@ import AusterCore
 import Foundation
 import Observation
 
-/// The user's preferences, as something SwiftUI can watch.
-///
-/// `AppConfig` is a `UserDefaults` façade: correct, shared with the engine, and
-/// completely invisible to SwiftUI, which redraws from `@Observable` properties
-/// and nothing else. This holds the handful of settings the interface actually
-/// binds to, reads them once at launch, and writes each change straight back —
-/// so the defaults stay the storage and this stays the notification.
-///
-/// Only settings the *UI* owns live here. The selective-sync exclusions
-/// deliberately do not: the database is their source of truth and the coordinator
-/// writes both copies (implementation note N10), so a third one would be a third
-/// thing to keep in step.
+/// The user's preferences, as something SwiftUI can watch. `AppConfig` stays the
+/// storage and is invisible to SwiftUI; this holds what the interface binds to
+/// and writes each change back. Selective sync stays out of it (note N10).
 @MainActor
 @Observable
 final class AppSettings {
@@ -48,11 +39,9 @@ final class AppSettings {
         updateCheckInterval = config.updateCheckInterval
     }
 
-    /// Whether change notifications are being held back right now.
-    ///
-    /// Computed from the date rather than from a timer: a snooze that expires
-    /// while the app is asleep has still expired, and nothing has to be running
-    /// for that to become true.
+    /// Whether change notifications are being held back right now. Computed from
+    /// the date rather than from a timer: a snooze that expires while the app is
+    /// asleep has still expired.
     var isSnoozed: Bool {
         guard let until = notificationsSnoozedUntil else { return false }
         return until > Date()

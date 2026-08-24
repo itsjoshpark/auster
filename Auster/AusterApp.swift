@@ -2,12 +2,9 @@ import AppKit
 import AusterCore
 import SwiftUI
 
-/// Auster's entry point.
-///
-/// The app is a menu-bar-only agent (`LSUIElement`): a `MenuBarExtra` menu, a
-/// `Settings` scene, and two ordinary windows for the things that genuinely do
-/// not fit in a menu. All sync logic lives in `AusterCore`; this target only
-/// renders state and forwards user intent.
+/// Auster's entry point: a menu-bar-only agent (`LSUIElement`) with a
+/// `MenuBarExtra` menu, a `Settings` scene, and two windows for what does not
+/// fit in a menu. All sync logic lives in `AusterCore`.
 @main
 struct AusterApp: App {
 
@@ -27,14 +24,9 @@ struct AusterApp: App {
             SettingsView(environment: environment)
         }
 
-        // This window is opened from the menu and nowhere else (ux §6), and it
-        // takes two modifiers to hold SwiftUI to that. `handlesExternalEvents`
-        // with an empty set is the load-bearing one: the OAuth redirect arrives
-        // as an open-URL event, and SwiftUI answers one by presenting its first
-        // eligible `Window` scene so that something can receive it — Auster
-        // reads the redirect from the app delegate instead (note N6), so no
-        // scene should volunteer. `defaultLaunchBehavior(.suppressed)` covers
-        // the same window being offered at launch.
+        // Opened from the menu and nowhere else (ux §6). An empty
+        // `handlesExternalEvents` set stops SwiftUI presenting this scene to
+        // receive the OAuth redirect, which the app delegate reads (note N6).
         Window("Sync Issues", id: SyncIssuesWindow.id) {
             SyncIssuesWindow(environment: environment)
         }
@@ -42,9 +34,7 @@ struct AusterApp: App {
         .defaultLaunchBehavior(.suppressed)
         .handlesExternalEvents(matching: [])
 
-        // The same two modifiers, for the same reason: any `Window` scene left
-        // eligible is one SwiftUI can present uninvited when the redirect
-        // arrives (note N41).
+        // The same two modifiers, for the same reason (note N41).
         Window("Recent Changes", id: RecentChangesWindow.id) {
             RecentChangesWindow(environment: environment)
         }
@@ -54,11 +44,9 @@ struct AusterApp: App {
     }
 }
 
-/// The menu bar's icon, as a view so that it tracks `SyncState`.
-///
-/// A `Scene`'s label is built once per update of the scene, and reading
-/// observable state from inside a view is what guarantees the icon changes when
-/// the status does.
+/// The menu bar's icon, as a view so that it tracks `SyncState`. A `Scene`'s
+/// label is built once per update, and reading observable state from inside a
+/// view is what guarantees the icon changes when the status does.
 private struct StatusIconLabel: View {
 
     @Bindable var environment: AppEnvironment
@@ -76,12 +64,9 @@ private struct StatusIconLabel: View {
     }
 }
 
-/// Handles the things a menu-bar-only app cannot do from a `Scene`.
-///
-/// The OAuth redirect arrives as a URL open. SwiftUI's `.onOpenURL` needs a view
-/// on screen to attach to, and a `MenuBarExtra` window is built lazily when the
-/// user clicks the icon — which is exactly when the redirect is *not* on screen.
-/// The delegate is always there (decisions N6).
+/// Handles the things a menu-bar-only app cannot do from a `Scene`. The OAuth
+/// redirect arrives as a URL open, and `.onOpenURL` needs a view on screen —
+/// which a lazily built `MenuBarExtra` is not. The delegate always is (N6).
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -90,15 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let onboardingController = OnboardingWindowController()
 
     /// Whether this process is hosting a test bundle rather than being run by
-    /// somebody.
-    ///
-    /// `AusterTests` uses `Auster.app` as its test host, so everything below
-    /// runs before a single test does. Two consequences, both bad: the
-    /// single-instance guard sees the developer's own running Auster and
-    /// terminates the host before the runner connects ("Early unexpected exit …
-    /// exited with code 0 before establishing connection"), and on a machine
-    /// where it *did* proceed, `environment.start()` would point the real engine
-    /// at the real Dropbox folder for the duration of a unit-test run.
+    /// somebody. `AusterTests` uses `Auster.app` as its host, so otherwise the
+    /// instance guard would kill it and the engine start on the real folder.
     private static var isRunningTests: Bool {
         let environment = ProcessInfo.processInfo.environment
         return environment["XCTestConfigurationFilePath"] != nil

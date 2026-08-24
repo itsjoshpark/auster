@@ -3,20 +3,9 @@ import AusterCore
 import Foundation
 import UserNotifications
 
-/// Delivers what `NotificationComposer` decided (ux §8).
-///
-/// The split is deliberate: every rule about *whether* and *what* to say lives
-/// in the composer, in `AusterCore`, where it is tested; this only knows how to
-/// hand a decided notification to macOS and what to do when its button is
-/// pressed.
-///
-/// Permission is requested on the first notification rather than at launch, as
-/// ux §8 asks. A permission sheet is much easier to say yes to when it arrives
-/// alongside something worth being notified about.
-///
-/// `@unchecked Sendable` because `SyncNotifying` is called from the coordinator's
-/// actor: everything mutable is behind the lock, and the delivery itself hops to
-/// the main actor.
+/// Delivers what `NotificationComposer` decided (ux §8). Every rule about
+/// whether and what to say lives in the composer; this only hands a decided
+/// notification to macOS. Permission is requested on the first one, not at launch.
 final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
 
     /// The identifiers the delegate reads back to find an action again.
@@ -63,14 +52,9 @@ final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
         compose { $0.fatal(error) }
     }
 
-    /// Decides on the main actor, then delivers.
-    ///
-    /// The composer's inputs are `@MainActor` state in the app — the linked
-    /// account, the snooze, the master switch — reached through
-    /// `MainActor.assumeIsolated`. `SyncNotifying` is called from the
-    /// coordinator's actor, so composing on the caller's executor runs those
-    /// closures off the main actor and `assumeIsolated` traps the process. The
-    /// hop has to happen before the decision, not just before the delivery.
+    /// Decides on the main actor, then delivers: the composer reads `@MainActor`
+    /// state through `MainActor.assumeIsolated`, and `SyncNotifying` is called
+    /// from the coordinator's actor, so the hop must precede the decision.
     private func compose(_ decide: @escaping @Sendable (NotificationComposer) -> SyncNotification?) {
         let composer = composer
         Task { @MainActor in
@@ -79,11 +63,8 @@ final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
     }
 
     /// Says that a re-index is under way after the database had to be recreated
-    /// (engine-doc §9).
-    ///
-    /// Not part of `SyncNotifying`: nothing failed, and nothing about a sync
-    /// cycle happened. What it explains is why Auster is about to be busy for a
-    /// while — activity with no cause is what makes a sync client look broken.
+    /// (engine-doc §9). Not part of `SyncNotifying`: nothing failed. It explains
+    /// why Auster is about to be busy, which is what stops it looking broken.
     @MainActor
     func rebuildingIndex() {
         post(
@@ -132,12 +113,9 @@ final class NotificationManager: NSObject, SyncNotifying, @unchecked Sendable {
         return await center.notificationSettings().authorizationStatus != .denied
     }
 
-    /// One category with one button, because every action Auster offers is
-    /// "show me" — the difference is only whether that means Finder or a web
-    /// page, and the notification carries which.
-    /// Built on demand rather than stored: `UNNotificationCategory` is not
-    /// `Sendable`, and a shared instance would be a mutable global in all but
-    /// name.
+    /// One category with one button, because every action Auster offers is "show
+    /// me" and the notification carries whether that means Finder or a web page.
+    /// Built on demand: `UNNotificationCategory` is not `Sendable`.
     private static var showCategory: UNNotificationCategory {
         UNNotificationCategory(
             identifier: showCategoryIdentifier,

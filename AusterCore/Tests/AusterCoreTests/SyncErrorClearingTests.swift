@@ -3,18 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// When a recorded sync issue is allowed to disappear.
-///
-/// An error row is the only thing that remembers a path is out of sync — it
-/// feeds the menu's issue count, the Sync Issues window, and the startup
-/// sequence's retry list. Clearing one for a path that is still wrong does not
-/// just lose a message: it loses the retry, and the file stays missing with the
-/// interface reporting that everything is fine.
-///
-/// Found live: a folder made read-only failed a download, and restoring the
-/// permission fired an FS event for the *folder*, whose upload skipped (nothing
-/// about the folder had changed) and cleared the whole subtree's errors —
-/// including the child that had never arrived.
+/// When a recorded sync issue is allowed to disappear. An error row feeds the
+/// menu count, the Sync Issues window and the startup retry list, so clearing
+/// one for a path that is still wrong loses the retry with it (note N40).
 @Suite("Sync error clearing")
 struct SyncErrorClearingTests {
 

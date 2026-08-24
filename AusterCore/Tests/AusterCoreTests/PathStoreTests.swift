@@ -4,19 +4,16 @@ import Testing
 @testable import AusterCore
 
 /// `PathStore` is the translation layer between two filesystems that disagree
-/// about identity: Dropbox is case-insensitive and NFC, macOS is
-/// case-preserving and hands back NFD. Every rule here exists because getting it
-/// wrong duplicates a user's file rather than syncing it (engine-doc §9).
+/// about identity: Dropbox is case-insensitive and NFC, macOS case-preserving
+/// and NFD. Getting it wrong duplicates a file rather than syncing it (§9).
 @Suite("PathStore")
 struct PathStoreTests {
 
     // MARK: - Fixtures
 
-    /// A store rooted in a fresh temp directory.
-    ///
-    /// The root is symlink-resolved because `/tmp` is itself a symlink on macOS,
-    /// and a store that disagreed with the caller about its own root would fail
-    /// every containment check.
+    /// A store rooted in a fresh temp directory. The root is symlink-resolved
+    /// because `/tmp` is itself a symlink on macOS, and a store that disagreed
+    /// about its own root would fail every containment check.
     private func withStore<T>(
         _ body: (PathStore, MockDropboxService, SyncDatabase, URL) async throws -> T
     ) async throws -> T {

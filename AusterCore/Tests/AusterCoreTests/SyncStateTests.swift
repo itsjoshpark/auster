@@ -3,14 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The one object the UI reads (design §2).
-///
-/// Its whole job is to turn several independent facts — is there an account, has
-/// something failed fatally, did the user pause, is the network there, is a
-/// transfer running — into a single answer to "what is Auster doing?". The
-/// precedence between them is the substance: a paused client that also cannot
-/// reach Dropbox should say "Paused", because that is the thing the user did and
-/// the thing they can undo.
+/// The one object the UI reads (design §2). The precedence between its facts is
+/// the substance: a paused client that also cannot reach Dropbox says "Paused",
+/// because that is what the user did and can undo.
 @Suite("SyncState")
 @MainActor
 struct SyncStateTests {

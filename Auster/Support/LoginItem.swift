@@ -1,13 +1,9 @@
 import Foundation
 import ServiceManagement
 
-/// The "Start at login" toggle, over `SMAppService` (ux §9).
-///
-/// Registration can fail for reasons the user can act on — an unsigned build, or
-/// a login item they disabled in System Settings — so `setEnabled` reports
-/// rather than swallows, and `isEnabled` always answers from the service instead
-/// of from a remembered preference. The system is the source of truth here: the
-/// user can turn Auster off in System Settings without ever opening Auster.
+/// The "Start at login" toggle, over `SMAppService` (ux §9). `setEnabled`
+/// reports failure rather than swallowing it, and `isEnabled` always asks the
+/// service: the user can turn Auster off in System Settings.
 enum LoginItem {
 
     static var isEnabled: Bool {

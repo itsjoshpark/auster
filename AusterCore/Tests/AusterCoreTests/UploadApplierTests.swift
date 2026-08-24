@@ -3,14 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// Sending one local change to Dropbox (engine-doc §5.6).
-///
-/// The upload direction is where Auster can destroy data it does not own, so
-/// most of these tests are about the handlers *declining* to act: a delete that
-/// the server would have to guess about, a rename across a boundary we do not
-/// sync, a name that would collide once Dropbox normalises it. The write mode
-/// and the revision guard carry the rest of the safety story (decisions D9.1,
-/// D9.5), so both are asserted on the wire rather than inferred.
+/// Sending one local change to Dropbox (engine-doc §5.6). The direction where
+/// Auster can destroy data it does not own, so most of these are about the
+/// handlers declining to act; the write mode and rev guard carry the rest.
 @Suite("UploadApplier")
 struct UploadApplierTests {
 
@@ -356,14 +351,9 @@ struct UploadApplierTests {
         #expect(fixture.service.recordedUploads.isEmpty)
     }
 
-    /// Dropbox paths are case-insensitive, so two local files whose names differ
-    /// only in case would become one remote file and silently destroy one of
-    /// them.
-    ///
-    /// The rule is tested as a pure function rather than end to end: producing
-    /// the collision needs a case-sensitive volume, and macOS ships
-    /// case-insensitive (and normalization-insensitive) by default, so the
-    /// situation cannot be staged on most machines — including CI.
+    /// Dropbox paths are case-insensitive, so two local files differing only in
+    /// case would become one remote file. Tested as a pure function: staging the
+    /// collision needs a case-sensitive volume, which macOS and CI are not.
     @Test("A name colliding with a sibling only by case is a case conflict")
     func caseCollisionIsDetected() {
         #expect(

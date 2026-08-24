@@ -3,11 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// `SyncItemEvent` is the one shape both directions of the engine work in, so
-/// these tests pin down the translation from Dropbox metadata: what counts as an
-/// addition versus a modification, how a tombstone recovers the type Dropbox
-/// does not report (api-notes §3), and where the casing of the local path comes
-/// from (engine-doc §1.4, §9).
+/// `SyncItemEvent` is the one shape both directions work in, so these pin the
+/// translation from Dropbox metadata: addition against modification, how a
+/// tombstone recovers its type (api-notes §3), and where local casing comes from.
 @Suite("SyncItemEvent")
 struct SyncItemEventTests {
 

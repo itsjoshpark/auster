@@ -1,14 +1,8 @@
 import Foundation
 
 /// What Auster offers when sync has stopped, and what each answer does
-/// (engine-doc §9, ux §9).
-///
-/// A pure function from a fatal error to a plan, for the same reason the sync
-/// engine keeps its decisions out of its file operations: these paths run on a
-/// user's worst day, when the folder has vanished or the token has been revoked,
-/// and the thing most likely to turn a bad day into a lost afternoon is a
-/// recovery that does its steps in the wrong order. Written down here, the order
-/// is a property that can be asserted.
+/// (engine-doc §9, ux §9). A pure function from a fatal error to a plan, so the
+/// order of the steps is a property that can be asserted.
 public enum RecoveryModel {
 
     /// How a fatal error reaches the user.
@@ -68,13 +62,9 @@ public enum RecoveryModel {
         }
     }
 
-    /// The steps that carry out one answer, in the order they must happen.
-    ///
-    /// The folder always comes back before the rebuild, twice over. A rebuild
-    /// with no folder would hit the very guard that raised the dialog; and a
-    /// rebuild is what makes adopting a folder full of the user's files *safe* —
-    /// identical files are skipped on their content hash, and differing ones
-    /// become conflicted copies rather than overwrites (decisions D9).
+    /// The steps that carry out one answer, in the order they must happen. The
+    /// folder always comes back before the rebuild: a rebuild with no folder hits
+    /// the guard that raised the dialog, and the rebuild is what makes it safe.
     public static func plan(for choice: FolderMissingChoice, configuredFolder: URL) -> [Action] {
         switch choice {
         case .locate(let url): [.adoptFolder(url), .rebuildIndex]
@@ -84,11 +74,9 @@ public enum RecoveryModel {
     }
 }
 
-/// The one-instance rule (ux §9).
-///
-/// Split from the AppKit scan so the decision can be tested: the trap is that
-/// the running-applications list includes the process asking, and an app that
-/// mistakes itself for a rival cannot be launched at all.
+/// The one-instance rule (ux §9). Split from the AppKit scan so the decision can
+/// be tested: the running-applications list includes the process asking, and an
+/// app that mistakes itself for a rival cannot be launched at all.
 public enum SingleInstance {
 
     public enum Decision: Sendable, Equatable {
@@ -100,12 +88,9 @@ public enum SingleInstance {
         case deferToExisting(pid_t)
     }
 
-    /// - Parameters:
-    ///   - otherProcessIdentifiers: every process with Auster's bundle id,
-    ///     including this one.
-    ///   - current: this process.
-    /// - Returns: whether to carry on launching, or which instance to hand over
-    ///   to.
+    /// `otherProcessIdentifiers` is every process with Auster's bundle id, this
+    /// one included, and `current` is this process. Returns whether to carry on
+    /// launching, or which instance to hand over to.
     public static func decision(otherProcessIdentifiers: [pid_t], current: pid_t) -> Decision {
         // Lowest pid wins, so two simultaneous launches agree on which of them
         // stands aside rather than both doing so.
