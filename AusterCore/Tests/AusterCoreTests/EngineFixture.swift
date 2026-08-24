@@ -2,13 +2,9 @@ import Foundation
 
 @testable import AusterCore
 
-/// A whole engine environment in a throwaway temp directory: an in-memory
-/// remote, a real on-disk database, a local Dropbox folder, and the path/hash
-/// helpers built on them.
-///
-/// A class rather than a struct so `deinit` can remove the directory: Swift
-/// Testing runs tests in parallel, so each one needs its own filesystem and its
-/// own cleanup, and a `defer` in every test would be one place to forget.
+/// A whole engine environment in a throwaway temp directory. A class so `deinit`
+/// can remove it — tests run in parallel, so each needs its own filesystem and
+/// its own cleanup.
 final class EngineFixture {
 
     /// The temp directory holding everything below.

@@ -4,11 +4,8 @@ import GRDB
 // MARK: - Public model
 
 /// One row of the sync index: an item both sides agreed on at the last sync
-/// (engine-doc §1.1).
-///
-/// Every diff — a local scan, a remote delta — is computed against these, which
-/// is why the key is the *lowercased* Dropbox path: Dropbox paths are
-/// case-insensitive, so two spellings must never become two rows.
+/// (engine-doc §1.1). The key is the lowercased Dropbox path, because Dropbox is
+/// case-insensitive and two spellings must never become two rows.
 public struct IndexEntry: Sendable, Equatable, Codable {
 
     /// Primary key. Lowercased and NFC-normalized by `PathStore.normalize`.
@@ -164,10 +161,8 @@ public enum StateKey: String {
 // MARK: - Storage records
 
 // The public models above stay free of GRDB: these internal records own the
-// column names and the on-disk representation. Dates are stored as Unix
-// timestamps rather than GRDB's default date strings because the engine
-// compares them against `stat` timestamps, where sub-second precision decides
-// whether a file counts as changed.
+// column names and the on-disk representation. Dates are Unix timestamps, so
+// sub-second precision survives comparison against `stat`.
 
 struct IndexRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "index_entry"

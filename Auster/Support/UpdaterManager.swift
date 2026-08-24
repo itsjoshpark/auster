@@ -3,15 +3,9 @@ import Foundation
 import Observation
 import Sparkle
 
-/// Sparkle, and the two things the interface asks of it.
-///
-/// The updater is started by hand rather than by `SPUStandardUpdaterController`
-/// itself, because starting can fail — an unsigned build, a placeholder public
-/// key, a copy running from a build directory — and Sparkle's own start would
-/// answer that with an alert at launch. Here a failure simply leaves
-/// `canCheckForUpdates` false, which is the state the controls were always
-/// written for: an app installed by something other than Sparkle has no updater
-/// either, so "unavailable" is a permanent state and not an error.
+/// Sparkle, and the two things the interface asks of it. The updater is started
+/// by hand because starting can fail, and Sparkle's own start would answer that
+/// with an alert at launch; a failure just leaves `canCheckForUpdates` false.
 @MainActor
 @Observable
 final class UpdaterManager {
@@ -50,11 +44,9 @@ final class UpdaterManager {
         controller?.updater.checkForUpdates()
     }
 
-    /// Binds automatic checks to the setting (ux §4).
-    ///
-    /// Sparkle would otherwise ask the user on first launch whether to check
-    /// automatically; writing the flag here answers that question from the
-    /// preference instead, so there is only ever one switch.
+    /// Binds automatic checks to the setting (ux §4). Sparkle would otherwise ask
+    /// the user on first launch whether to check automatically; writing the flag
+    /// here answers from the preference, so there is only ever one switch.
     func apply(checkInterval: UpdateCheckInterval) {
         guard let updater = controller?.updater else { return }
         if let duration = checkInterval.duration {

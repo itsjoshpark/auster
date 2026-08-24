@@ -1,14 +1,9 @@
 import AppKit
 import AusterCore
 
-/// Which menu bar glyph a sync status wears (ux §1).
-///
-/// A pure mapping in its own type because it is the one piece of the interface
-/// that is always on screen and never read carefully: the user glances at it and
-/// decides whether to worry. The two rules worth stating out loud are that a
-/// fatal error outranks everything, and that per-path sync issues badge the icon
-/// only once nothing is in flight — an issue that the running cycle is about to
-/// clear is not worth alarming anyone about (engine-doc §10).
+/// Which menu bar glyph a sync status wears (ux §1). A fatal error outranks
+/// everything, and per-path sync issues badge the icon only once nothing is in
+/// flight — an issue the running cycle is about to clear is not worth alarm.
 enum StatusIcon {
 
     /// The template image set for a status.
@@ -28,11 +23,8 @@ enum StatusIcon {
     }
 
     /// The icon as the status bar wants it: a template image at 18 pt, so the
-    /// system tints it for light, dark and tinted menu bars (design README).
-    ///
-    /// `NSImage` rather than a SwiftUI `Image` because a `MenuBarExtra` label
-    /// takes the artwork at its natural size, and the artwork is drawn on a
-    /// 36-point canvas.
+    /// system tints it for light, dark and tinted menu bars. `NSImage` because a
+    /// `MenuBarExtra` label takes the artwork at its natural size.
     @MainActor
     static func image(named name: String) -> NSImage? {
         guard let image = NSImage(named: name) else { return nil }

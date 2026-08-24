@@ -1,11 +1,9 @@
 import AusterCore
 import SwiftUI
 
-/// The tri-state folder tree of ux §5.
-///
-/// Draws `FolderTreeModel` and nothing else: every rule about what a checkbox
-/// means, and what toggling one does to the selection, lives in the model where
-/// it can be tested without a window.
+/// The tri-state folder tree of ux §5. Draws `FolderTreeModel` and nothing else:
+/// every rule about what a checkbox means, and what toggling one does, lives in
+/// the model where it can be tested without a window.
 struct SelectiveSyncTree: View {
 
     let model: FolderTreeModel
@@ -41,12 +39,9 @@ struct SelectiveSyncTree: View {
     }
 }
 
-/// One folder, and — once expanded — the folders inside it.
-///
-/// Expansion is driven from here rather than from the model: whether a branch is
-/// *open* is a property of this view, while whether its children are *known* is
-/// a property of the model, and conflating the two would reload a level every
-/// time the user collapsed and reopened it.
+/// One folder, and — once expanded — the folders inside it. Expansion is driven
+/// from here: whether a branch is open belongs to the view, whether its children
+/// are known belongs to the model, and conflating them reloads on every reopen.
 private struct FolderTreeRow: View {
 
     let model: FolderTreeModel
@@ -125,10 +120,9 @@ private struct FolderTreeRow: View {
     }
 }
 
-/// The tree plus the two buttons that commit or abandon a selection.
-///
-/// Nothing is applied as the user clicks: selective sync deletes folders, so the
-/// change is deliberate and reversible right up to the moment Apply is pressed.
+/// The tree plus the two buttons that commit or abandon a selection. Nothing is
+/// applied as the user clicks: selective sync deletes folders, so the change
+/// stays reversible right up to the moment Apply is pressed.
 struct SelectiveSyncEditor: View {
 
     @Bindable var environment: AppEnvironment

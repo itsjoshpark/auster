@@ -2,11 +2,9 @@ import Foundation
 
 // MARK: - Metadata
 
-/// A file as Dropbox describes it.
-///
-/// Deliberately a value type independent of `SwiftyDropbox`: the sync engine
-/// compares and stores these, and nothing outside `LiveDropboxService` should
-/// have to know how the SDK spells them.
+/// A file as Dropbox describes it. A value type independent of `SwiftyDropbox`:
+/// the sync engine compares and stores these, and nothing outside
+/// `LiveDropboxService` should have to know how the SDK spells them.
 public struct RemoteFile: Sendable, Equatable {
 
     /// Stable across moves and renames (`"id:..."`); the rev is not.
@@ -152,11 +150,9 @@ public enum RemoteMetadata: Sendable, Equatable {
 
 // MARK: - Listing
 
-/// One page of `list_folder` / `list_folder/continue`.
-///
-/// The cursor is per page, not per listing: it is persisted after each page's
-/// entries are applied so an interrupted index resumes rather than restarts
-/// (decisions D9.4).
+/// One page of `list_folder` / `list_folder/continue`. The cursor is per page,
+/// not per listing: it is persisted after each page's entries are applied, so an
+/// interrupted index resumes rather than restarts (decisions D9.4).
 public struct ListPage: Sendable {
     public let entries: [RemoteMetadata]
     public let cursor: String

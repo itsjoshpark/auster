@@ -4,19 +4,8 @@ import SwiftyDropbox
 import Testing
 
 /// A real Dropbox account, a real network, and a scoped place to make a mess
-/// (api-notes §7).
-///
-/// Everything else in Auster's test suite runs against `MockDropboxService`,
-/// which is a *model* of Dropbox. This target exists to check the model: the
-/// places where the mock says Dropbox behaves surprisingly — conflicted copies
-/// on a stale rev, tombstones that do not say what they buried, content hashes
-/// that have to match ours byte for byte — are exactly the places where being
-/// wrong would be invisible until a user lost a file.
-///
-/// It is opt-in, and it is opt-in twice over: `AUSTER_INTEGRATION=1` says the
-/// caller means it, and a credential says they have somewhere to run it. Without
-/// both, every test here reports as skipped rather than failing, so `swift test`
-/// stays green on a machine with no Dropbox account.
+/// (api-notes §7). Opt-in twice: `AUSTER_INTEGRATION=1` and a credential, or
+/// every test here reports as skipped.
 enum IntegrationHarness {
 
     /// Everything this suite creates lives under here, and nothing outside it is
@@ -79,11 +68,9 @@ enum IntegrationHarness {
 
     // MARK: - The service
 
-    /// A live service for the configured credential.
-    ///
-    /// Built per call rather than shared: `swift-testing` runs tests in
-    /// parallel, and a `DropboxClient` per test keeps one test's retry backoff
-    /// from being another's.
+    /// A live service for the configured credential, built per call rather than
+    /// shared: tests run in parallel, and a client per test keeps one test's
+    /// retry backoff from being another's.
     static func makeService() throws -> any DropboxService {
         guard let credentials else {
             throw IntegrationError.notConfigured(skipReasonText)
@@ -130,11 +117,8 @@ extension String {
 }
 
 /// One test's own remote folder and local scratch directory, removed on the way
-/// out however the test ended.
-///
-/// A class so `deinit` can do the cleanup: a `defer` in every test is one place
-/// to forget, and what gets forgotten here is a folder in somebody's real
-/// Dropbox.
+/// out however the test ended. A class so `deinit` can do it — what gets
+/// forgotten here is a folder in somebody's real Dropbox.
 final class IntegrationScope {
 
     let service: any DropboxService
@@ -146,12 +130,9 @@ final class IntegrationScope {
     /// A local temp directory, for staging downloads and hashing.
     let localRoot: URL
 
-    /// Builds a scope whose remote folder already exists.
-    ///
-    /// Dropbox creates parent folders implicitly on upload, so a scope that only
-    /// ever uploads would not need this — but listing a folder that has never
-    /// been written to answers `path/not_found`, not an empty page, so a test
-    /// that lists before it writes needs the folder to be there.
+    /// Builds a scope whose remote folder already exists. Listing a folder never
+    /// written to answers `path/not_found` rather than an empty page, so a test
+    /// that lists before it writes needs the folder there.
     static func make() async throws -> IntegrationScope {
         let scope = try IntegrationScope()
         _ = try await scope.service.createFolder(path: scope.remotePath, autorename: false)
@@ -196,10 +177,8 @@ final class IntegrationScope {
     // MARK: - Convenience
 
     /// `autorename` defaults to `true` because that is what `UploadApplier`
-    /// sends on every upload it makes. It is the difference between Dropbox
-    /// refusing a stale-rev write and Dropbox writing a conflicted copy beside
-    /// the original, so a harness that defaulted the other way would be testing
-    /// a call the engine never issues (note N39).
+    /// sends: it is the difference between a refused stale-rev write and a
+    /// conflicted copy beside the original (note N39).
     @discardableResult
     func upload(
         _ name: String,

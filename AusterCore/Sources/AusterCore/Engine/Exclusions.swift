@@ -1,12 +1,8 @@
 import Foundation
 
-/// What never syncs (engine-doc §8).
-///
-/// Two independent rules, deliberately kept apart because they fail differently:
-/// `isExcludedName` is a fixed policy about junk — caches, editor scratch files,
-/// Finder metadata — that both directions apply unconditionally, while
-/// `isExcluded(byUser:)` is the user's selective-sync choice, which Phase 7 lets
-/// them change and which a remote deletion can retract.
+/// What never syncs (engine-doc §8). Two independent rules: `isExcludedName` is
+/// a fixed policy about junk that both directions apply, while
+/// `isExcluded(byUser:)` is the selective-sync choice the user can change.
 public enum Exclusions {
 
     /// The name of the engine's staging directory. It lives *inside* the Dropbox
@@ -14,13 +10,9 @@ public enum Exclusions {
     /// exactly why it also has to be excluded from sync.
     public static let cacheDirectoryName = ".auster.cache"
 
-    /// The §8 list, lowercased for comparison.
-    ///
-    /// Case-insensitive rather than the literal case-sensitive list of the
-    /// research doc: Dropbox paths are case-insensitive, so `Desktop.ini` and
-    /// `desktop.ini` are one file, and a rule that caught only one spelling
-    /// would sync the other. (The doc's list spells two of these twice for the
-    /// same reason.)
+    /// The §8 list, lowercased for comparison. Case-insensitive rather than the
+    /// research doc's literal list: Dropbox paths are case-insensitive, so
+    /// `Desktop.ini` and `desktop.ini` are one file.
     private static let excludedNames: Set<String> = [
         "desktop.ini",
         "thumbs.db",
@@ -38,11 +30,9 @@ public enum Exclusions {
         cacheDirectoryName,
     ]
 
-    /// Whether an item is one Auster never syncs.
-    ///
-    /// Accepts a bare name or a whole path: *every* component is checked, so
-    /// anything inside an excluded folder is excluded with it. Without that, the
-    /// staging directory's own contents would be queued for upload.
+    /// Whether an item is one Auster never syncs. Accepts a bare name or a whole
+    /// path — every component is checked, so anything inside an excluded folder
+    /// goes with it, the staging directory's own contents included.
     public static func isExcludedName(_ pathOrName: String) -> Bool {
         pathOrName
             .split(separator: "/", omittingEmptySubsequences: true)
@@ -62,10 +52,8 @@ public enum Exclusions {
     }
 
     /// Whether a path falls inside the user's selective-sync exclusions.
-    ///
-    /// `excluded` holds normalized (lowercased, NFC) Dropbox paths; the query is
-    /// normalized here so a caller may pass either spelling. Matching is on
-    /// component boundaries — `"/a"` covers `/a/b` but not `/ab`.
+    /// `excluded` holds normalized paths and the query is normalized here.
+    /// Matching is on component boundaries: `"/a"` covers `/a/b` but not `/ab`.
     public static func isExcluded(byUser dbxPathLower: String, excluded: Set<String>) -> Bool {
         guard !excluded.isEmpty else { return false }
         let path = PathStore.normalize(dbxPathLower)

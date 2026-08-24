@@ -5,9 +5,7 @@ import Testing
 
 /// `SyncDatabase` is the only thing standing between a crash and a full
 /// re-index, so every table is exercised through its public API against a real
-/// on-disk SQLite file — an in-memory double would not catch the schema, the
-/// prefix semantics of subtree queries, or corruption recovery, which is most of
-/// what can actually go wrong here.
+/// on-disk SQLite file: schema, subtree prefix semantics, corruption recovery.
 @Suite("SyncDatabase")
 struct SyncDatabaseTests {
 
@@ -15,8 +13,7 @@ struct SyncDatabaseTests {
 
     /// A database in a fresh temp directory, removed when `body` returns.
     ///
-    /// The directory (not just the file) is removed because SQLite leaves `-wal`
-    /// and `-shm` siblings behind.
+    /// The directory, not just the file: SQLite leaves `-wal` and `-shm` behind.
     private func withDatabase<T>(_ body: (SyncDatabase, URL) throws -> T) throws -> T {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("auster-db-\(UUID().uuidString)")

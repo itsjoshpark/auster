@@ -18,20 +18,14 @@ public enum DownloadConflict: Sendable, Equatable {
     case localNewerOrIdentical
 }
 
-/// The §4.4 decision table.
-///
-/// The rules are cheap-to-expensive as well as safe-to-risky, and their *order*
-/// carries as much meaning as the rules themselves: revision equality answers
-/// most events without touching the disk, content equality answers the rest
-/// without touching the network, and only what survives both gets as far as
-/// asking whether the user has edits that would be destroyed.
+/// The §4.4 decision table. The rules run cheap-to-expensive and safe-to-risky:
+/// revision equality answers most events without the disk, content equality the
+/// rest without the network, and only survivors ask about local edits.
 public enum ConflictResolver {
 
-    /// Decides what an incoming remote event may do to the local item.
-    ///
-    /// `index` is the index row for the event's path (`nil` when the engine has
-    /// never synced it); `database` is consulted only for outstanding upload
-    /// errors.
+    /// Decides what an incoming remote event may do to the local item. `index` is
+    /// the row for the event's path (`nil` when the engine has never synced it);
+    /// `database` is consulted only for outstanding upload errors.
     public static func check(
         event: SyncItemEvent,
         index: IndexEntry?,

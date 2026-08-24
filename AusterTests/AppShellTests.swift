@@ -93,10 +93,9 @@ struct AppShellTests {
         #expect(AppKey.resolve("  abc123  ") == "abc123")
     }
 
-    /// Skipped where the build has no key: `Config/Secrets.xcconfig` is
-    /// gitignored, so CI never has one. Where a key *is* configured, this proves
-    /// the xcconfig reached both `Info.plist` entries — the value Auster reads
-    /// and the `db-` scheme the OAuth redirect comes back on.
+    /// Skipped where the build has no key — `Config/Secrets.xcconfig` is
+    /// gitignored, so CI never has one. Where one is configured, this proves it
+    /// reached both `Info.plist` entries: the value Auster reads and the scheme.
     @Test(
         "a configured app key reaches the built bundle",
         .enabled(if: AppKey.value != nil)

@@ -3,13 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The §4.4 decision table, one test per row plus the cases where its *order*
-/// is what matters.
-///
-/// This is the single point where the engine decides whether a remote change may
-/// touch local bytes, so every row is pinned separately: a rule that fires one
-/// position too early silently discards the user's edits, which is precisely
-/// what decisions D9.1 forbids.
+/// The §4.4 decision table, one test per row plus the cases where its order is
+/// what matters: a rule that fires one position too early discards the user's
+/// edits, which decisions D9.1 forbids.
 @Suite("ConflictResolver")
 struct ConflictResolverTests {
 

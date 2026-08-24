@@ -4,13 +4,9 @@ import Testing
 
 @testable import Auster
 
-/// How a completed sync event is presented in the Recent Changes window
-/// (ux §2 item 10, §7).
-///
-/// Pure, and tested apart from the view for the same reason `StatusIcon` is:
-/// the glyph and the direction are the whole content of a row somebody scans
-/// rather than reads, and a removal that offers "reveal in Finder" points at
-/// something that is not there any more.
+/// How a completed sync event is presented in the Recent Changes window (ux §7).
+/// Tested apart from the view: a removal must not offer to reveal something that
+/// is no longer there.
 @Suite("Recent change presentation")
 struct RecentChangePresentationTests {
 

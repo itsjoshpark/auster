@@ -3,12 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The tri-state folder tree behind the selective-sync UI (ux §5).
-///
-/// The model is the whole of the behaviour — the view only draws it — so these
-/// pin down the two things a checkbox tree is easy to get wrong: that what the
-/// user sees always describes the same selection the engine would act on, and
-/// that a level nobody has expanded yet is not silently assumed to be empty.
+/// The tri-state folder tree behind selective sync (ux §5). The model is the
+/// whole behaviour: what the user sees is the selection the engine would act on,
+/// and an unexpanded level is not assumed empty.
 @MainActor
 @Suite("Folder tree model")
 struct FolderTreeModelTests {

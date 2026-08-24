@@ -1,11 +1,8 @@
 import Foundation
 
-/// Everything Auster asks of Dropbox.
-///
-/// The sync engine only ever talks to this protocol, which is what lets the
-/// whole engine be tested headless against `MockDropboxService`. Every method
-/// throws `DropboxServiceError` and nothing else; retries and backoff live
-/// behind the implementation, so callers see one attempt's worth of outcome.
+/// Everything Auster asks of Dropbox. The engine only talks to this protocol,
+/// which is what lets it be tested headless against `MockDropboxService`. Every
+/// method throws `DropboxServiceError`; retries live behind the implementation.
 public protocol DropboxService: Sendable {
 
     // MARK: Account
@@ -20,17 +17,14 @@ public protocol DropboxService: Sendable {
     /// Starts a listing. `path` is `""` for the Dropbox root, never `"/"`.
     func listFolder(path: String, recursive: Bool) async throws -> ListPage
 
-    /// Continues a listing, or fetches changes since `cursor`.
-    ///
-    /// Throws `.cursorReset` when Dropbox invalidates the cursor; the caller
-    /// must then discard it and re-index from scratch (api-notes §5).
+    /// Continues a listing, or fetches changes since `cursor`. Throws
+    /// `.cursorReset` when Dropbox invalidates the cursor; the caller must then
+    /// discard it and re-index from scratch (api-notes §5).
     func listFolderContinue(cursor: String) async throws -> ListPage
 
     /// Blocks until something changes after `cursor` or `timeout` seconds pass.
-    ///
-    /// `timeout` must be 30–480 seconds; the server adds up to 90 s of jitter on
-    /// top. The reply says whether there are changes, and carries a
-    /// server-requested backoff to sleep through before longpolling again.
+    /// `timeout` must be 30–480 seconds and the server adds up to 90 s of jitter.
+    /// The reply carries a server-requested backoff to sleep through.
     func longpoll(cursor: String, timeout: Int) async throws -> (changes: Bool, backoff: Int?)
 
     // MARK: Single items
@@ -40,16 +34,9 @@ public protocol DropboxService: Sendable {
 
     // MARK: Transfers
 
-    /// Downloads a specific revision to `localURL`, verifying the content hash
-    /// as the bytes stream past.
-    ///
-    /// Addressing by `rev` rather than path means we get exactly the version the
-    /// engine decided to apply, even if the path has moved on since. `localURL`
-    /// is a staging path in the cache directory; the caller moves it into place
-    /// atomically (decisions D9.3). On an unrecoverable hash mismatch the partial
-    /// file is deleted and `.dataCorrupted` is thrown.
-    ///
-    /// `progress` receives the cumulative bytes written so far.
+    /// Downloads a specific revision to `localURL`, verifying the content hash as
+    /// the bytes stream past. `localURL` is a staging path the caller moves into
+    /// place atomically (D9.3); a mismatch deletes it and throws `.dataCorrupted`.
     func download(
         rev: String,
         to localURL: URL,
@@ -57,12 +44,8 @@ public protocol DropboxService: Sendable {
     ) async throws -> RemoteFile
 
     /// Uploads a local file, in one call at or below 4 MiB and through an upload
-    /// session above it (api-notes §6).
-    ///
-    /// If the file changes while it is being read, the upload is abandoned with
-    /// `.fileChangedDuringUpload` rather than committing a torn snapshot.
-    ///
-    /// `progress` receives the cumulative bytes sent so far.
+    /// session above it (api-notes §6). A file that changes mid-read is abandoned
+    /// with `.fileChangedDuringUpload` rather than committing a torn snapshot.
     func upload(
         from localURL: URL,
         to dbxPath: String,

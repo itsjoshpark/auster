@@ -1,15 +1,7 @@
 #!/bin/bash
-#
 # test.sh — run the AusterCore test suite, then build the app.
-#
-# The engine lives in AusterCore and carries the bulk of the coverage, so it
-# runs first: a failure there should not wait on an app build.
-#
-# The integration suite (AusterCoreIntegrationTests) talks to a real Dropbox
-# account. It runs only with AUSTER_INTEGRATION=1 *and* a credential —
-# AUSTER_TEST_TOKEN, or AUSTER_TEST_REFRESH_TOKEN with AUSTER_APP_KEY — and
-# reports as skipped otherwise. It is left out of the default run entirely, so a
-# machine with no account never pays for the network round trips.
+# The integration suite needs AUSTER_INTEGRATION=1 and a credential, and is left
+# out of the default run so a machine with no account pays nothing for it.
 
 set -euo pipefail
 

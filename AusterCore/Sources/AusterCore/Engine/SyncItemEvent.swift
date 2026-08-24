@@ -1,13 +1,8 @@
 import Foundation
 
 /// One change to apply, in the single shape both directions of the engine work
-/// in (engine-doc §1.4).
-///
-/// Remote and local changes arrive in very different forms — Dropbox metadata on
-/// one side, FSEvents on the other — and the conflict table, the ordering rules
-/// and the activity display all want to reason about them identically. This is
-/// that common shape: everything the engine needs to decide what to do, resolved
-/// once at the boundary so nothing downstream has to consult the index again.
+/// in (engine-doc §1.4). Everything needed to decide what to do, resolved once
+/// at the boundary so nothing downstream has to consult the index again.
 public struct SyncItemEvent: Sendable, Equatable {
 
     public var direction: SyncDirection
@@ -89,16 +84,9 @@ public struct SyncItemEvent: Sendable, Equatable {
 
 extension SyncItemEvent {
 
-    /// Builds a download event from one entry of a Dropbox listing.
-    ///
-    /// Two lookups make this async rather than a plain initializer: the index
-    /// decides whether this is an addition or a modification (and, for a
-    /// tombstone, what type of thing was deleted), and `correctCase` fills in
-    /// the ancestor casing that `path_display` does not guarantee (api-notes §3).
-    ///
-    /// The *basename* always comes from the event, never from the index: a
-    /// remote rename that only changes case would otherwise be erased before
-    /// §4.6's case-change step could see it.
+    /// Builds a download event from one entry of a Dropbox listing. The basename
+    /// always comes from the event, never the index: a remote rename that only
+    /// changes case would otherwise be erased before §4.6 could see it.
     public init(
         remote: RemoteMetadata,
         index: SyncDatabase,
@@ -152,17 +140,9 @@ extension SyncItemEvent {
         }
     }
 
-    /// Builds an upload event from a cleaned filesystem event.
-    ///
-    /// Everything the far side will need is resolved here, while the file is
-    /// still in front of us: its hash, its size, whether it is a symlink, and
-    /// what the index last knew about it. The handlers then work from the event
-    /// alone, which is what lets a whole batch be hashed in parallel before any
-    /// of it is uploaded.
-    ///
-    /// Unlike the download direction there is nothing to await: local paths need
-    /// no case correction, because the disk *is* the authority on how they are
-    /// spelled.
+    /// Builds an upload event from a cleaned filesystem event, resolving hash,
+    /// size, symlink-ness and the index row while the file is in front of us.
+    /// That is what lets a whole batch be hashed in parallel before any upload.
     public init(
         local event: RawFSEvent,
         index: SyncDatabase,

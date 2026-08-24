@@ -4,10 +4,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The Dropbox content hash is how Auster decides whether a local file and a
-/// remote revision are the same bytes without transferring anything, so it is
-/// checked against an independent implementation of the published algorithm
-/// (api-notes §4) rather than against itself.
+/// The Dropbox content hash decides whether a local file and a remote revision
+/// are the same bytes without transferring anything, so it is checked against an
+/// independent implementation of the published algorithm (api-notes §4).
 @Suite("ContentHasher")
 struct ContentHasherTests {
 

@@ -1,17 +1,9 @@
 import Foundation
 import Observation
 
-/// The setup wizard, as a state machine (ux §3).
-///
-/// UI-free for the usual reason — `AusterCore` never imports SwiftUI — but also
-/// because of what the wizard *is*: the sequence in which Auster acquires the
-/// two things it cannot work without, an account and a folder. Getting the order
-/// wrong strands the user half-linked, and that is worth being able to test
-/// without a browser or a window.
-///
-/// Nothing the wizard collects is applied until the last page. The folder and
-/// the selective-sync choice are carried in memory and handed over together, so
-/// a wizard the user abandons leaves no trace beyond credentials they can unlink.
+/// The setup wizard, as a state machine (ux §3). Nothing it collects is applied
+/// until the last page: the folder and the selective-sync choice are carried in
+/// memory, so an abandoned wizard leaves no trace beyond credentials.
 @MainActor
 @Observable
 public final class OnboardingModel {
@@ -65,11 +57,9 @@ public final class OnboardingModel {
     private let onFinish: (URL, Set<String>) async -> Void
     private var hasFinished = false
 
-    /// - Parameters:
-    ///   - auth: the link manager, or `nil` in a build with no app key — the
-    ///     wizard then shows its pages but cannot get past the first.
-    ///   - defaultLocation: where the proposed Dropbox folder is created.
-    ///   - onFinish: persists the folder and the selection, and starts sync.
+    /// `auth` is the link manager, or `nil` in a build with no app key;
+    /// `defaultLocation` is where the proposed Dropbox folder is created;
+    /// `onFinish` persists the folder and the selection, and starts sync.
     public init(
         auth: AuthManager?,
         defaultLocation: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -126,10 +116,9 @@ public final class OnboardingModel {
         Self.folder(in: location)
     }
 
-    /// Whether `url` can be adopted without asking anything further.
-    ///
-    /// "Empty" ignores the names that never sync — a `.DS_Store` Finder left
-    /// behind is not a reason to ask the user about merging (engine-doc §8).
+    /// Whether `url` can be adopted without asking anything further. "Empty"
+    /// ignores the names that never sync: a `.DS_Store` Finder left behind is not
+    /// a reason to ask the user about merging (engine-doc §8).
     public func decision(for url: URL) -> FolderDecision {
         let contents = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
         let meaningful = contents.filter { !Exclusions.isExcludedName($0) }
@@ -171,11 +160,9 @@ public final class OnboardingModel {
         }
     }
 
-    /// Writes the choices down and starts sync.
-    ///
-    /// Guarded because the done page's button is the one users double-click:
-    /// starting the engine twice would build a second object graph over the same
-    /// database.
+    /// Writes the choices down and starts sync. Guarded because the done page's
+    /// button is the one users double-click, and starting twice would build a
+    /// second object graph over the same database.
     public func finish() async {
         guard !hasFinished else { return }
         hasFinished = true

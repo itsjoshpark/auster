@@ -1,16 +1,9 @@
 import Foundation
 import SwiftyDropbox
 
-/// Translates SwiftyDropbox failures into the engine's vocabulary.
-///
-/// The SDK reports failures as `CallError<E>`, where `E` is a different union
-/// per route. The engine cannot switch on twelve unions, and more importantly
-/// should not: what it needs to know is whether to wait, skip, conflict-copy or
-/// re-link. That decision is made once, here (api-notes §5).
-///
-/// The route-specific half is deliberately `Any`-typed. `CallError` boxes its
-/// route error in a type the SDK does not let us construct, so a generic switch
-/// is the only shape that both `map` and its tests can reach.
+/// Translates SwiftyDropbox failures into the engine's vocabulary (api-notes
+/// §5): whether to wait, skip, conflict-copy or re-link, decided once here. The
+/// route half is `Any`-typed because `CallError` boxes it unreachably.
 enum DropboxErrorMapper {
 
     /// Maps a whole `CallError`. `path` names the entry the call was about, for

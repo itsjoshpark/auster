@@ -30,14 +30,8 @@ public struct ActivityItem: Identifiable, Sendable, Equatable {
 }
 
 /// Everything the interface reads, and the only thing it reads (design §2).
-///
-/// `status` is derived rather than stored. The coordinator knows several
-/// independent facts — whether an account is linked, whether something failed
-/// fatally, whether the user paused, whether the network is there, whether a
-/// transfer is running — and each arrives from a different place at a different
-/// time. Storing a single status would mean every one of those call sites had to
-/// know the priority of all the others; deriving it means the priority is
-/// written down once, here.
+/// `status` is derived rather than stored, so the priority between the several
+/// independent facts is written down once, here.
 @MainActor
 @Observable
 public final class SyncState {
@@ -53,13 +47,9 @@ public final class SyncState {
 
     // MARK: - Derived
 
-    /// What Auster is doing, in the order that matters to the user.
-    ///
-    /// Needing setup comes first because nothing else means anything without an
-    /// account. A pause outranks both syncing and connecting because it is the
-    /// thing the user did and the thing they can undo — reporting "Connecting…"
-    /// to someone who deliberately paused would suggest it is about to start
-    /// again.
+    /// What Auster is doing, in the order that matters to the user. Needing setup
+    /// comes first; a pause outranks syncing and connecting, because it is the
+    /// thing the user did and the thing they can undo.
     public var status: Status {
         if !isLinked { return .needsSetup }
         if let fatalError { return .fatalError(fatalError) }
@@ -91,11 +81,9 @@ public final class SyncState {
 
     // MARK: - Status inputs
 
-    /// Whether credentials exist at all.
-    ///
-    /// Deliberately separate from `account`: the profile can only be fetched
-    /// online, and treating its absence as "not linked" would send a linked user
-    /// who happens to be offline back through the setup wizard.
+    /// Whether credentials exist at all — separate from `account`, whose profile
+    /// can only be fetched online. Treating its absence as "not linked" would
+    /// send a linked user who happens to be offline back through the wizard.
     public func setLinked(_ linked: Bool) {
         isLinked = linked
         if !linked { account = nil }
@@ -153,10 +141,9 @@ public final class SyncState {
         activity.removeAll()
     }
 
-    /// Updates the row for an item, adding it if it is not being tracked yet.
-    ///
-    /// Progress can arrive without a start — an ad-hoc fetch does not announce
-    /// itself — and dropping it would leave a running transfer invisible.
+    /// Updates the row for an item, adding it if it is not tracked yet. Progress
+    /// can arrive without a start, and dropping it would leave a running transfer
+    /// invisible.
     private func upsertActivity(_ event: SyncItemEvent, _ update: (inout ActivityItem) -> Void) {
         if let index = activity.firstIndex(where: { $0.id == event.dbxPathLower }) {
             update(&activity[index])
@@ -182,8 +169,8 @@ public final class SyncState {
             usageText = "Usage unknown"
             return
         }
-        let percent = String(format: "%.1f%%", usage.fraction * 100)
-        let total = ByteCountFormatter.string(fromByteCount: usage.allocated, countStyle: .file)
+        let percent = usage.fraction.formatted(.percent.precision(.fractionLength(1)))
+        let total = usage.allocated.formatted(.byteCount(style: .file))
         usageText = "\(percent) of \(total) used"
     }
 

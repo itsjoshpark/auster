@@ -4,9 +4,8 @@ import Testing
 @testable import AusterCore
 
 /// Every local mutation the engine makes goes through this type, so its job is
-/// less "wrap FileManager" than "make the dangerous cases impossible": an
-/// interrupted download must never be visible (D9.3), and a delete must never
-/// hit a file that merely resembles its target (§4.8).
+/// to make the dangerous cases impossible: an interrupted download must never be
+/// visible (D9.3), and a delete must never hit a lookalike (§4.8).
 @Suite("LocalFileOperations")
 struct LocalFileOperationsTests {
 

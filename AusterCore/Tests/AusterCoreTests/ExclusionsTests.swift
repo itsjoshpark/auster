@@ -3,10 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The two ways an item is kept out of sync (engine-doc §8): names nobody ever
-/// wants synced, and folders the user deselected. Getting either wrong is
-/// visible — an over-eager rule silently drops a real file, a lax one uploads
-/// `.DS_Store` to every folder — so the whole list is pinned here.
+/// The two ways an item is kept out of sync (engine-doc §8): names nobody wants
+/// synced, and folders the user deselected. An over-eager rule drops a real
+/// file, a lax one uploads `.DS_Store` everywhere, so the whole list is pinned.
 @Suite("Exclusions")
 struct ExclusionsTests {
 
@@ -93,10 +92,9 @@ struct ExclusionsTests {
         #expect(!Exclusions.isExcluded(byUser: "/work/current", excluded: excluded))
     }
 
-    /// The set holds normalized paths, and so must the query: an event's path
-    /// arrives cased, and lowercasing it is the caller's job — but a
-    /// differently-normalized *Unicode* spelling of the same name is the same
-    /// path, and must still match.
+    /// The set holds normalized paths and so must the query: lowercasing an
+    /// event's path is the caller's job, but a differently-normalized Unicode
+    /// spelling of the same name is the same path and must still match.
     @Test("Matching is normalization-insensitive")
     func normalizationInsensitive() {
         let excluded: Set<String> = [PathStore.normalize("/caf\u{00E9}")]

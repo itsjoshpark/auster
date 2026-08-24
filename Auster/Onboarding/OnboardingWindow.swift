@@ -2,13 +2,9 @@ import AppKit
 import AusterCore
 import SwiftUI
 
-/// The setup wizard's window (ux §3).
-///
-/// An AppKit window rather than a SwiftUI `Window` scene, for one reason: it has
-/// to be on screen at launch, before the user has clicked anything. A scene can
-/// only be opened from inside a view's environment, and a menu-bar app has no
-/// view on screen until its icon is clicked — which is precisely the click a
-/// user with nothing set up has no reason to make.
+/// The setup wizard's window (ux §3). An AppKit window rather than a SwiftUI
+/// scene because it has to be on screen at launch: a scene opens only from a
+/// view's environment, and a menu-bar app has none until its icon is clicked.
 @MainActor
 final class OnboardingWindowController: NSObject, NSWindowDelegate {
 

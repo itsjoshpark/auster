@@ -1,11 +1,8 @@
 import Foundation
 
-/// A failure that concerns one path and nothing else (design §5).
-///
-/// The cycle records these and keeps going: a file Dropbox refuses to name, a
-/// download that will not verify, a path the user has no permission for. They
-/// land in the `sync_errors` table, show up as sync issues, and are retried on
-/// the next pass over that path.
+/// A failure that concerns one path and nothing else (design §5). The cycle
+/// records these and keeps going; they land in `sync_errors`, show up as sync
+/// issues, and are retried on the next pass over that path.
 public struct SyncItemError: Error, Sendable, Equatable {
 
     public var dbxPath: String
@@ -45,11 +42,9 @@ public struct SyncItemError: Error, Sendable, Equatable {
     }
 }
 
-/// A failure that stops sync entirely (design §5).
-///
-/// Unlike `SyncItemError`, none of these can be worked around by skipping an
-/// item: the engine has lost the folder, the account, or its own state, and
-/// carrying on would mean guessing at the user's data.
+/// A failure that stops sync entirely (design §5). Unlike `SyncItemError`, none
+/// of these can be worked around by skipping an item: the engine has lost the
+/// folder, the account, or its own state.
 public enum SyncFatalError: Error, Sendable, Equatable {
 
     /// The local Dropbox folder is gone or was renamed. Never interpreted as a

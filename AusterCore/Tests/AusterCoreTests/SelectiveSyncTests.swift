@@ -128,12 +128,8 @@ struct SelectiveSyncTests {
 }
 
 /// A coordinator over a real database and a mock remote, driven a cycle at a
-/// time.
-///
-/// Deliberately stops the steady-state loops the moment startup is done: what
-/// selective sync has to be pinned down about is *what changing the selection
-/// does*, and a longpoll loop racing the assertions would only make that
-/// harder to see.
+/// time. The steady-state loops stop once startup is done, so a longpoll cannot
+/// race the assertions.
 @MainActor
 final class SelectiveSyncFixture {
 

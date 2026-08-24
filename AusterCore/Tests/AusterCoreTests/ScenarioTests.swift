@@ -3,15 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The engine's acceptance tests: whole scenarios driven end to end against an
-/// in-memory Dropbox and a real local folder (design §6).
-///
-/// Every one of them ends in the same assertion — that the disk, the remote and
-/// the index agree — because convergence is the only property a sync client is
-/// actually judged on. The individual rules are pinned in the unit suites; what
-/// these check is that the rules compose into a syncer.
-///
-/// Serialized: several drive a live FSEvents stream with real settle windows.
+/// The engine's acceptance tests: whole scenarios end to end against an
+/// in-memory Dropbox and a real local folder (design §6), each ending in the
+/// same assertion. Serialized: several drive a live FSEvents stream.
 @Suite("Scenarios", .serialized)
 struct ScenarioTests {
 
@@ -65,10 +59,9 @@ struct ScenarioTests {
 
     // MARK: - The echo test
 
-    /// The single most important test in the phase. Every file a download writes
-    /// lands in a folder that is being watched, so without the ignore mechanism
-    /// (§5.2) each one would immediately be seen as a local change and uploaded
-    /// straight back — forever.
+    /// Every file a download writes lands in a folder that is being watched, so
+    /// without the ignore mechanism (§5.2) each one would immediately be seen as
+    /// a local change and uploaded straight back — forever.
     @Test("Downloading produces no local events to upload")
     func downloadsDoNotEcho() async throws {
         let harness = try ScenarioHarness()
@@ -263,10 +256,9 @@ struct ScenarioTests {
 
     // MARK: - Transfers
 
-    /// Above the 4 MiB threshold `LiveDropboxService` switches to an upload
-    /// session; `DropboxService` deliberately hides that, so what the engine can
-    /// be held to here is that a large file round-trips with its content hash
-    /// intact. The chunking itself is exercised by the Phase 9 integration tests.
+    /// Above 4 MiB `LiveDropboxService` switches to an upload session, which
+    /// `DropboxService` hides, so what the engine can be held to here is that a
+    /// large file round-trips with its content hash intact.
     @Test("A file larger than the chunk threshold round-trips intact")
     func largeFileRoundTrips() async throws {
         let harness = try ScenarioHarness()

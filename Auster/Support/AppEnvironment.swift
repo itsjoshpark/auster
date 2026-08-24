@@ -4,16 +4,8 @@ import Foundation
 import Observation
 
 /// The composition root: builds the engine's object graph once and owns it.
-///
-/// Assembly order is forced rather than chosen. The engine needs its callbacks
-/// at construction; those callbacks need somewhere to put results and something
-/// to feed rescans back into; and the coordinator, which owns all of that, needs
-/// the engine. `SyncEventCollector` and `SyncCoordinator.engineEvents` exist to
-/// break that cycle, and this is the one place the knot is tied.
-///
-/// Everything here is app-target glue. `AusterCore` holds the logic; this holds
-/// the wiring, the lifetime, and the handful of AppKit gestures — reveal in
-/// Finder, open a URL — that a menu item needs and `AusterCore` may not make.
+/// Assembly order is forced — the engine needs its callbacks at construction and
+/// the coordinator needs the engine — and this is where that knot is tied.
 @MainActor
 @Observable
 final class AppEnvironment {
@@ -54,11 +46,8 @@ final class AppEnvironment {
     private var hasSlept = false
 
     /// Called when Auster no longer has what it needs to sync and the wizard has
-    /// to come back — which today means the user unlinked from Settings.
-    ///
-    /// A callback rather than a direct call because the wizard is an AppKit
-    /// window owned by the app delegate, and the environment has no business
-    /// knowing that.
+    /// to come back. A callback rather than a direct call, because the wizard is
+    /// an AppKit window the environment has no business knowing about.
     var onNeedsSetup: (@MainActor () -> Void)?
 
     private var database: SyncDatabase?
@@ -112,10 +101,8 @@ final class AppEnvironment {
     }
 
     /// Builds the object graph over the current folder without starting it.
-    ///
     /// Separate from `restartSync` because a rebuild does not want the startup
-    /// sequence first: it is about to throw away everything that sequence would
-    /// have produced.
+    /// sequence first: it is about to throw away everything that would produce.
     private func adoptCoordinator() {
         guard coordinator == nil else { return }
         coordinator = buildCoordinator()
@@ -124,12 +111,8 @@ final class AppEnvironment {
     // MARK: - Recovery (engine-doc §9)
 
     /// Watches the status for a fatal error, and offers whatever the recovery
-    /// model says it should.
-    ///
-    /// `withObservationTracking` rather than a callback on `SyncState`: the
-    /// state object's job is to describe sync, not to know that somebody wants
-    /// to put a dialog on screen. The tracking is one-shot, so it re-arms itself
-    /// each time it fires.
+    /// model says it should. `withObservationTracking`, so `SyncState` need not
+    /// know anyone wants a dialog; one-shot, and re-armed each time it fires.
     func observeFatalErrors() {
         withObservationTracking {
             _ = state.status
@@ -143,12 +126,9 @@ final class AppEnvironment {
         }
     }
 
-    /// Keeps Sparkle's automatic checks in step with the setting.
-    ///
-    /// The preference is the switch the user sees, so it has to be the one that
-    /// decides; Sparkle keeps its own copy in the defaults and would otherwise
-    /// go on using whatever it was told at launch. One-shot tracking, re-armed
-    /// each time it fires, as with `observeFatalErrors`.
+    /// Keeps Sparkle's automatic checks in step with the setting. The preference
+    /// is the switch the user sees, and Sparkle would otherwise go on using
+    /// whatever it was told at launch. One-shot tracking, re-armed each time.
     func observeUpdateCheckInterval() {
         withObservationTracking {
             _ = settings.updateCheckInterval
@@ -219,15 +199,9 @@ final class AppEnvironment {
 
     // MARK: - Sleep and wake (ux §9)
 
-    /// Re-checks both sides after the machine wakes.
-    ///
-    /// Neither loop survives a sleep in any useful sense: the longpoll
-    /// connection is dead, and FSEvents owes nothing about what other devices
-    /// did in the meantime. Rather than wait for the longpoll to time out and
-    /// retry — which can be a minute or more, on the one occasion the user is
-    /// most likely to be looking — waking runs the same two cycles startup runs.
-    ///
-    /// `willSleep` is watched only so that a `didWake` without one is ignored.
+    /// Re-checks both sides after the machine wakes: the longpoll connection is
+    /// dead and FSEvents owes nothing about other devices, so waking runs the
+    /// same two cycles startup runs. `willSleep` is watched to qualify `didWake`.
     func observeSleepAndWake() {
         let center = NSWorkspace.shared.notificationCenter
 
@@ -250,12 +224,8 @@ final class AppEnvironment {
     }
 
     /// Moves the Dropbox folder and points the engine at its new home (ux §4).
-    ///
-    /// Sync stops first and the object graph goes with it: `LocalFileMonitor`
-    /// watches a path, and a watcher left running over a folder being moved
-    /// would report the move as the user deleting everything.
-    ///
-    /// - Throws: `FolderMover.MoveError`, with sync put back where it was.
+    /// Sync stops first: a watcher left running over a folder being moved would
+    /// report it as the user deleting everything. Throws `FolderMover.MoveError`.
     func moveDropboxFolder(to destination: URL) async throws {
         isBusy = true
         defer { isBusy = false }
@@ -308,11 +278,9 @@ final class AppEnvironment {
         }
     }
 
-    /// Ends onboarding: remembers the choices and brings sync up.
-    ///
-    /// The selection is written through the coordinator *before* the first sync
-    /// so the initial index already filters it — a folder the user deselected in
-    /// the wizard should never arrive and then be deleted again.
+    /// Ends onboarding: remembers the choices and brings sync up. The selection
+    /// is written through the coordinator before the first sync, so a folder
+    /// deselected in the wizard never arrives and is then deleted again.
     func finishSetup(dropboxFolder: URL, excludedItems: Set<String>) async {
         settings.dropboxFolderURL = dropboxFolder
         guard isLinked else { return }
@@ -343,12 +311,9 @@ final class AppEnvironment {
         await coordinator?.rebuildIndex()
     }
 
-    /// Unlinks and tears the graph down, returning the app to setup.
-    ///
-    /// The user's files are deliberately left alone: unlinking stops syncing
-    /// them, it does not disown them (ux §4). Everything Auster derived — the
-    /// index, the cursors, the preferences — goes, so a later relink starts from
-    /// a clean sheet rather than from state describing a different account.
+    /// Unlinks and tears the graph down, returning the app to setup. The user's
+    /// files are left alone (ux §4); everything Auster derived goes, so a later
+    /// relink starts clean rather than from state describing another account.
     func unlink() async {
         await coordinator?.stopForQuit()
         coordinator = nil
@@ -367,10 +332,8 @@ final class AppEnvironment {
     // MARK: - Selective sync
 
     /// A folder tree seeded with the selection the engine is currently using.
-    ///
     /// Seeded from `AppConfig` rather than the database: the mirror exists for
-    /// exactly this (implementation note N10), and the UI has no business
-    /// opening the engine's tables.
+    /// exactly this (note N10), and the UI does not open the engine's tables.
     func makeFolderTreeModel() -> FolderTreeModel? {
         guard let service else { return nil }
         return FolderTreeModel(service: service, excluded: settings.config.excludedItems)
@@ -442,8 +405,7 @@ final class AppEnvironment {
             if database.wasResetOnOpen {
                 // The file on disk was unusable and had to be recreated. Nothing
                 // is lost — the index is derivable from both sides — but the
-                // re-index that follows is long enough to be worth explaining
-                // rather than leaving as unexplained activity (engine-doc §9).
+                // re-index that follows is long enough to be worth explaining.
                 notifier.rebuildingIndex()
             }
 
@@ -488,11 +450,9 @@ final class AppEnvironment {
         }
     }
 
-    /// The notifier the coordinator talks to, over the composer's rules.
-    ///
-    /// Every input is read through a closure rather than captured: the account,
-    /// the master switch and the snooze all change while sync is running, and a
-    /// notifier built once at launch would go on using whatever they were then.
+    /// The notifier the coordinator talks to, over the composer's rules. Every
+    /// input is read through a closure rather than captured: the account, the
+    /// master switch and the snooze all change while sync is running.
     private func makeNotifier() -> NotificationManager {
         let settings = settings
         let state = state

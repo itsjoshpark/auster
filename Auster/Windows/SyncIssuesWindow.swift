@@ -1,12 +1,9 @@
 import AusterCore
 import SwiftUI
 
-/// The Sync Issues window of ux §6.
-///
-/// One row per path the engine could not sync, with what went wrong and the two
-/// things a user can do about it: look at the file, or look at what Dropbox has.
-/// Rows leave as the engine clears them — the list is `state.syncErrors`, and
-/// that is emptied by a successful retry, not by this window.
+/// The Sync Issues window of ux §6: one row per path the engine could not sync,
+/// with the two things a user can do about it. Rows leave as the engine clears
+/// them — the list is `state.syncErrors`, emptied by a successful retry.
 struct SyncIssuesWindow: View {
 
     static let id = "sync-issues"

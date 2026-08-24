@@ -2,17 +2,40 @@ import AppKit
 import AusterCore
 import SwiftUI
 
-/// The menu bar menu, top to bottom exactly as ux §2 lists it.
-///
-/// A real menu rather than a window-style panel. The panel was chosen so that
-/// the status and activity rows could be richer than a menu item, but the rows
-/// ux §2 actually asks for are lines of text, and emulating a menu inside a
-/// window cost more than it bought: a hand-built hover highlight on every row,
-/// and a snooze "submenu" that was a pop-up button — it needed a click, opened
-/// downwards over the rows below, and drew its disclosure on the wrong side.
-/// `.menuBarExtraStyle(.menu)` gets all of that from AppKit, including a
-/// submenu that opens on hover (note N42).
+/// The menu bar menu, top to bottom exactly as ux §2 lists it. A real `NSMenu`:
+/// the snooze row is a genuine submenu, and the highlight, the disabled info
+/// rows and the shortcut column come from AppKit (note N42).
 struct MenuBarView: View {
+
+    @Bindable var environment: AppEnvironment
+
+    var body: some View {
+        Button("Open Dropbox Folder") { environment.openDropboxFolder() }
+        Button("Launch Dropbox Website") { environment.openDropboxWebsite() }
+
+        if environment.state.status == .needsSetup {
+            UnlinkedRows(environment: environment)
+        } else {
+            LinkedRows(environment: environment)
+        }
+
+        Divider()
+        Button("Quit Auster") { quit() }
+            .keyboardShortcut("q")
+    }
+
+    /// Cursors and index rows are written as each change lands, so quitting only
+    /// has to stop the loops (ux §9).
+    private func quit() {
+        Task {
+            await environment.stopForQuit()
+            NSApp.terminate(nil)
+        }
+    }
+}
+
+/// The menu as it stands once an account is linked (ux §2).
+private struct LinkedRows: View {
 
     @Bindable var environment: AppEnvironment
 
@@ -22,28 +45,9 @@ struct MenuBarView: View {
     private var state: SyncState { environment.state }
 
     var body: some View {
-        Button("Open Dropbox Folder") { environment.openDropboxFolder() }
-        Button("Launch Dropbox Website") { environment.openDropboxWebsite() }
-
-        if state.status == .needsSetup {
-            unlinkedRows
-        } else {
-            linkedRows
-        }
-
-        Divider()
-        Button("Quit Auster") { quit() }
-            .keyboardShortcut("q")
-    }
-
-    // MARK: - Linked (ux §2)
-
-    @ViewBuilder
-    private var linkedRows: some View {
         Divider()
 
-        // A `Text` in a menu is a disabled item, which is what these rows are:
-        // Maestral's could not be clicked either.
+        // A `Text` in a menu is a disabled item, which is what these rows are.
         if let account = state.account {
             Text(account.email)
         }
@@ -60,7 +64,7 @@ struct MenuBarView: View {
             Button("Please re-link Auster…") { environment.relink() }
         }
 
-        syncIssuesRow
+        SyncIssuesRow(environment: environment)
 
         Button(state.status == .paused ? "Resume Syncing" : "Pause Syncing") {
             Task {
@@ -79,7 +83,7 @@ struct MenuBarView: View {
 
         Divider()
 
-        snoozeRows
+        SnoozeRows(environment: environment)
 
         Button("Rebuild Index…") { confirmRebuild() }
             .disabled(environment.isBusy)
@@ -91,50 +95,6 @@ struct MenuBarView: View {
         Button("Check for Updates…") { environment.updater.checkForUpdates() }
             .disabled(!environment.updater.canCheckForUpdates)
     }
-
-    @ViewBuilder
-    private var syncIssuesRow: some View {
-        if state.syncErrors.isEmpty {
-            Text("No Sync Issues")
-        } else {
-            Button("Show Sync Issues (\(state.syncErrors.count))…") {
-                openWindow(id: SyncIssuesWindow.id)
-                NSApp.activate(ignoringOtherApps: true)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var snoozeRows: some View {
-        if environment.settings.isSnoozed, let until = environment.settings.notificationsSnoozedUntil {
-            Text("Notifications snoozed until \(Self.time.string(from: until))")
-            Button("Turn On Notifications") { environment.settings.turnOnNotifications() }
-        } else {
-            // Nested in a menu, this is a real submenu: it opens on hover, flies
-            // out to the side, and draws its own disclosure (ux §2 item 12).
-            Menu("Snooze Notifications") {
-                Button("For the next 30 minutes") { environment.settings.snoozeNotifications(for: 30 * 60) }
-                Button("For the next hour") { environment.settings.snoozeNotifications(for: 3600) }
-                Button("For the next 8 hours") { environment.settings.snoozeNotifications(for: 8 * 3600) }
-            }
-        }
-    }
-
-    // MARK: - Unlinked (ux §2)
-
-    @ViewBuilder
-    private var unlinkedRows: some View {
-        Divider()
-        Text("Setting up…")
-
-        Divider()
-        StartAtLoginRow()
-        Button("Help Center") {
-            NSWorkspace.shared.open(URL(string: "https://github.com/itsjoshpark/auster")!)
-        }
-    }
-
-    // MARK: - Helpers
 
     /// The status line of engine-doc §10.
     private var statusText: String {
@@ -148,12 +108,11 @@ struct MenuBarView: View {
         }
     }
 
-    /// Menu content is an `NSMenu`, not a view hierarchy, so a SwiftUI
-    /// confirmation dialog has nothing to attach itself to — the confirmation
-    /// ux §2 item 13 asks for is an alert (note N42).
+    /// Menu content is an `NSMenu`, so the confirmation ux §2 item 13 asks for
+    /// is an alert rather than a SwiftUI dialog (note N42).
     private func confirmRebuild() {
         let alert = NSAlert()
-        alert.messageText = "Rebuild Auster's sync index?"
+        alert.messageText = "Rebuild Auster’s sync index?"
         alert.informativeText = """
             Auster will compare every file with Dropbox again. This can take a \
             while for a large Dropbox, and nothing is lost: where the two sides \
@@ -162,36 +121,77 @@ struct MenuBarView: View {
         alert.addButton(withTitle: "Rebuild")
         alert.addButton(withTitle: "Cancel")
 
-        // The app has no windows of its own to bring forward, and an alert from
-        // a background agent would otherwise open behind whatever is in front.
+        // A background agent has no window of its own to bring forward, so the
+        // alert would open behind whatever is in front.
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Task { await environment.rebuildIndex() }
     }
+}
 
-    /// Quitting stops the loops first; cursors and index rows are written as
-    /// each change lands, so there is nothing else to flush (ux §9).
-    private func quit() {
-        Task {
-            await environment.stopForQuit()
-            NSApp.terminate(nil)
+/// The issues row of ux §2 item 8: a count to click when there is one, a
+/// disabled reassurance when there is not.
+private struct SyncIssuesRow: View {
+
+    @Bindable var environment: AppEnvironment
+
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        if environment.state.syncErrors.isEmpty {
+            Text("No Sync Issues")
+        } else {
+            Button("Show Sync Issues (\(environment.state.syncErrors.count))…") {
+                openWindow(id: SyncIssuesWindow.id)
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
     }
+}
 
-    private static let time: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return formatter
-    }()
+/// The snooze submenu of ux §2 item 12, and what stands in its place while
+/// notifications are snoozed.
+private struct SnoozeRows: View {
+
+    @Bindable var environment: AppEnvironment
+
+    var body: some View {
+        if environment.settings.isSnoozed, let until = environment.settings.notificationsSnoozedUntil {
+            Text("Notifications snoozed until \(until.formatted(date: .omitted, time: .shortened))")
+            Button("Turn On Notifications") { environment.settings.turnOnNotifications() }
+        } else {
+            // Nested in a menu, this is a real submenu: it opens on hover and
+            // flies out to the side (note N42).
+            Menu("Snooze Notifications") {
+                Button("For the next 30 minutes") { environment.settings.snoozeNotifications(for: 30 * 60) }
+                Button("For the next hour") { environment.settings.snoozeNotifications(for: 3600) }
+                Button("For the next 8 hours") { environment.settings.snoozeNotifications(for: 8 * 3600) }
+            }
+        }
+    }
+}
+
+/// The unlinked menu of ux §2, before setup has been through.
+private struct UnlinkedRows: View {
+
+    @Bindable var environment: AppEnvironment
+
+    var body: some View {
+        Divider()
+        Text("Setting up…")
+
+        Divider()
+        StartAtLoginRow()
+        Button("Help Center") {
+            NSWorkspace.shared.open(URL(string: "https://github.com/itsjoshpark/auster")!)
+        }
+    }
 }
 
 // MARK: - Rows
 
-/// One in-flight transfer, as a line of text.
-///
-/// A menu item cannot hold a progress bar, and ux §2 item 7 does not ask for
-/// one: it describes progress in words.
+/// One in-flight transfer, as a line of text. A menu item cannot hold a progress
+/// bar, and ux §2 item 7 does not ask for one: it describes progress in words.
 enum ActivityLine {
 
     static func text(for item: ActivityItem) -> String {

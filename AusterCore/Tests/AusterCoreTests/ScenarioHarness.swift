@@ -2,14 +2,9 @@ import Foundation
 
 @testable import AusterCore
 
-/// A whole two-way syncer in a temp directory: the in-memory Dropbox, a real
-/// database, a real FSEvents watcher wired through the real ignore filter, and
-/// the engine on top of them (design §6).
-///
-/// The scenario tests are the engine's acceptance tests, so this deliberately
-/// assembles the *production* object graph rather than test doubles of it. The
-/// echo test in particular is only meaningful if the ignore filter and the
-/// watcher are the ones the app would use.
+/// A whole two-way syncer in a temp directory (design §6): the production
+/// object graph, not doubles of it — the echo test is only meaningful if the
+/// ignore filter and the watcher are the ones the app uses.
 final class ScenarioHarness {
 
     let root: URL
@@ -166,12 +161,9 @@ final class ScenarioHarness {
 
     // MARK: - Convergence
 
-    /// Everything the three sources of truth disagree about.
-    ///
-    /// Convergence is the only assertion that matters for a syncer, and it is
-    /// three-way: the disk, the remote, and the index that claims to describe
-    /// both. An empty result means a user looking at either side would see the
-    /// same thing, and a restart would not undo it.
+    /// Everything the three sources of truth disagree about. Convergence is
+    /// three-way — disk, remote, and the index that claims to describe both —
+    /// and an empty result means a restart would not undo it.
     func convergenceProblems() throws -> [String] {
         var problems: [String] = []
 

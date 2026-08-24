@@ -1,11 +1,9 @@
 import AusterCore
 import SwiftUI
 
-/// Page 4 of ux §3: which folders come down to this Mac.
-///
-/// The same tree as the Settings tab, but the selection is only *carried* here —
-/// there is no engine yet to apply it to. It is handed over with the folder when
-/// the last page finishes, so the very first index already filters it.
+/// Page 4 of ux §3: which folders come down to this Mac. The same tree as the
+/// Settings tab, but the selection is only carried here — handed over with the
+/// folder when the last page finishes, so the first index already filters it.
 struct SelectiveSyncPage: View {
 
     @Bindable var model: OnboardingModel

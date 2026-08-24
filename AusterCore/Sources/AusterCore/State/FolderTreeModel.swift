@@ -2,16 +2,8 @@ import Foundation
 import Observation
 
 /// The lazily loaded, tri-state folder tree the selective-sync UI draws (ux §5).
-///
-/// All of the behaviour lives here rather than in the view, for one reason: what
-/// the checkboxes show and what the engine would act on have to be the same
-/// thing. The model therefore keeps exactly one piece of state — the excluded
-/// set — and every node's appearance is *derived* from it. A tree where the
-/// boxes were the state could drift from the selection it claims to describe,
-/// and the user would find out by losing a folder.
-///
-/// UI-free despite being a view model: `AusterCore` never imports SwiftUI
-/// (design §2), and the tree is worth testing without one.
+/// The model keeps one piece of state — the excluded set — and every node's
+/// appearance is derived from it, so the boxes cannot drift from the selection.
 @MainActor
 @Observable
 public final class FolderTreeModel {
@@ -29,11 +21,9 @@ public final class FolderTreeModel {
         case mixed
     }
 
-    /// One folder in the tree.
-    ///
-    /// A class because the view holds on to nodes across reloads and because
-    /// expansion mutates one in place; `@Observable` so that expanding a branch
-    /// redraws that branch rather than the whole tree.
+    /// One folder in the tree. A class because the view holds nodes across
+    /// reloads and expansion mutates one in place; `@Observable` so expanding a
+    /// branch redraws that branch rather than the whole tree.
     @MainActor
     @Observable
     public final class Node: Identifiable {
@@ -102,11 +92,9 @@ public final class FolderTreeModel {
         refreshStates()
     }
 
-    /// Fetches one level of subfolders, once.
-    ///
-    /// A whole level at a time, not a subtree: `toggle` relies on a node's
-    /// children being *complete* once loaded, since that is what lets it push a
-    /// parent's exclusion down onto the siblings of a re-checked child.
+    /// Fetches one level of subfolders, once. A whole level, not a subtree:
+    /// `toggle` relies on a node's children being complete once loaded, which is
+    /// what lets it push a parent's exclusion onto a re-checked child's siblings.
     public func expand(_ node: Node) async {
         guard node.children == nil, !node.isLoading else { return }
         node.isLoading = true
@@ -143,11 +131,9 @@ public final class FolderTreeModel {
 
     // MARK: - Selection
 
-    /// Flips one folder, cascading to everything loaded beneath it.
-    ///
-    /// `mixed` counts as "not fully included", so tapping it includes rather
-    /// than excludes — the same as every other tri-state checkbox, and the
-    /// direction that cannot lose a folder by accident.
+    /// Flips one folder, cascading to everything loaded beneath it. `mixed`
+    /// counts as "not fully included", so tapping it includes rather than
+    /// excludes — the direction that cannot lose a folder by accident.
     public func toggle(_ node: Node) {
         if node.checkState == .on {
             exclude(node.dbxPathLower)
@@ -174,12 +160,8 @@ public final class FolderTreeModel {
     }
 
     /// Stops excluding a path, preserving every exclusion that is not about it.
-    ///
-    /// The interesting case is a path whose *ancestor* is excluded. That
-    /// exclusion cannot simply be dropped — it stands for the ancestor's other
-    /// children too — so it is pushed one level down at a time, re-excluding
-    /// each sibling that is not on the way to `pathLower`, until nothing above
-    /// the path is excluded any more.
+    /// An ancestor's exclusion stands for its other children too, so it is pushed
+    /// down a level at a time, re-excluding each sibling off the path.
     private func include(_ pathLower: String) {
         excluded = excluded.filter { !isAtOrUnder($0, pathLower) }
 

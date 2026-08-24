@@ -2,11 +2,8 @@ import Foundation
 import SwiftyDropbox
 
 /// The one thing the OAuth flow needs that `AusterCore` cannot do itself:
-/// putting a URL in front of the user, and telling them when that failed.
-///
-/// SwiftyDropbox's desktop entry point takes an `NSApplication`, and `AusterCore`
-/// does not import AppKit, so the app target supplies this instead (decisions
-/// N5). Everything else about linking stays in the core.
+/// putting a URL in front of the user. SwiftyDropbox's desktop entry point
+/// takes an `NSApplication`, so the app target supplies this (decisions N5).
 @MainActor
 public protocol AuthorizationPresenter: AnyObject {
 
@@ -19,11 +16,8 @@ public protocol AuthorizationPresenter: AnyObject {
 }
 
 /// Adapts an `AuthorizationPresenter` to the interface SwiftyDropbox drives the
-/// OAuth flow through.
-///
-/// This is what `DesktopSharedApplication` does in the SDK, minus AppKit: on
-/// macOS there is no in-app authorization channel, so every route ends up
-/// opening the system browser.
+/// OAuth flow through — `DesktopSharedApplication` minus AppKit. On macOS every
+/// route ends up opening the system browser.
 final class SharedApplicationBridge: SharedApplication, @unchecked Sendable {
 
     private let presenter: any AuthorizationPresenter

@@ -1,26 +1,13 @@
 import Foundation
 
-/// Works out what changed while Auster was not watching (engine-doc §6).
-///
-/// A full walk of the local folder, diffed against the index. Moves cannot be
-/// recovered this way — nothing recorded where anything went — so a rename
-/// surfaces as a deletion plus a creation. That is not as lossy as it sounds:
-/// the upload handler's content-equality check (§5.6) recognises the bytes
-/// already on the remote and skips the transfer.
-///
-/// The deletions are the dangerous half. Everything the index knows but the disk
-/// does not looks like the user deleting it, and a Dropbox folder that was
-/// renamed or unmounted looks exactly like the user deleting *everything*. So
-/// the root guard runs first and throws, rather than returning a scan that would
-/// wipe the account (§9).
+/// Works out what changed while Auster was not watching (engine-doc §6): a full
+/// walk diffed against the index, where a rename surfaces as a delete plus a
+/// create. The root guard runs first, or a moved folder would wipe the account.
 public enum CatchUpScanner {
 
-    /// `localCursor` is when the last upload cycle completed; together with each
-    /// item's own `last_sync` it forms the bar an mtime has to clear.
-    ///
-    /// - Returns: synthetic events describing the difference, ready for the same
-    ///   clean → convert → apply pipeline a live batch goes through.
-    /// - Throws: `SyncFatalError.dropboxFolderMissing` when the folder is gone.
+    /// `localCursor` is when the last upload cycle completed; with each item's
+    /// `last_sync` it is the bar an mtime has to clear. Returns synthetic events;
+    /// throws `SyncFatalError.dropboxFolderMissing` when the folder is gone.
     public static func scan(
         root: URL,
         database: SyncDatabase,

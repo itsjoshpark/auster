@@ -28,17 +28,8 @@ public struct SyncNotification: Sendable, Equatable {
 }
 
 /// Decides what the user is told about a sync cycle (engine-doc §10, ux §8).
-///
-/// Pure, and separate from the thing that posts notifications, because the hard
-/// part is the judgement rather than the delivery. Three rules shape all of it:
-///
-/// - Only *remote* changes are announced. A user who just saved a file does not
-///   need to be told they saved a file — and by construction this only ever
-///   receives download batches and conflicts.
-/// - A cycle is one notification, not one per file. Thirty files arriving is one
-///   event to the person watching.
-/// - A snooze is about noise. It silences changes and conflicts, never a failure:
-///   something that is not syncing is not noise.
+/// Only remote changes are announced, a cycle is one notification rather than
+/// one per file, and a snooze silences changes but never a failure.
 public struct NotificationComposer: Sendable {
 
     /// Where Dropbox keeps things that have been deleted (ux §8).
@@ -48,13 +39,9 @@ public struct NotificationComposer: Sendable {
     private let displayName: @Sendable (String) -> String?
     private let changeNotificationsSuppressed: @Sendable () -> Bool
 
-    /// - Parameters:
-    ///   - ownAccountId: the linked account, so its own edits read as "You".
-    ///   - displayName: names for other people's account ids, from whatever
-    ///     cache the caller keeps. Returning `nil` is fine — the notification
-    ///     then says "Someone", which is true and costs no network call.
-    ///   - changeNotificationsSuppressed: the snooze and the master switch,
-    ///     read fresh so a snooze that starts mid-cycle still takes effect.
+    /// `ownAccountId` makes our own edits read as "You"; `displayName` names
+    /// other account ids and may return `nil`, which reads as "Someone";
+    /// `changeNotificationsSuppressed` is the snooze, read fresh mid-cycle.
     public init(
         ownAccountId: @escaping @Sendable () -> String?,
         displayName: @escaping @Sendable (String) -> String? = { _ in nil },
@@ -137,11 +124,9 @@ public struct NotificationComposer: Sendable {
 
     // MARK: - Internals
 
-    /// Who made a change, in the second person where that is us.
-    ///
-    /// Dropbox only reports an author inside shared folders. Everywhere else the
-    /// absence is itself the answer: nobody but the account holder can write
-    /// there, so an unattributed change is one of their own machines.
+    /// Who made a change, in the second person where that is us. Dropbox only
+    /// reports an author inside shared folders; elsewhere the absence is the
+    /// answer, since nobody but the account holder can write there.
     private func actor(of event: SyncItemEvent) -> String {
         guard let changedBy = event.changedBy, changedBy != ownAccountId() else { return "You" }
         return displayName(changedBy) ?? "Someone"

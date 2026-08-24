@@ -52,7 +52,7 @@ struct FolderPage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .confirmationDialog(
-            "\"\(candidate?.lastPathComponent ?? "Dropbox")\" already has files in it.",
+            "“\(candidate?.lastPathComponent ?? "Dropbox")” already has files in it.",
             isPresented: $isConfirmingMerge
         ) {
             Button("Merge") { if let candidate { model.confirmFolder(candidate) } }

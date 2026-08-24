@@ -1,12 +1,8 @@
 import Foundation
 
-/// The sync algorithms of engine-doc §§3–9.
-///
-/// An actor because only one cycle may mutate the local folder and the index at
-/// a time (design §3); parallelism lives *inside* a cycle, in the bounded task
-/// group that runs file transfers. Nothing here decides *when* to sync — the
-/// coordinator drives longpolling and scheduling, so a cycle is always something
-/// somebody asked for and can cancel.
+/// The sync algorithms of engine-doc §§3–9. An actor because only one cycle may
+/// mutate the local folder and the index at a time (design §3); parallelism
+/// lives inside a cycle. Nothing here decides *when* to sync.
 public actor SyncEngine {
 
     /// Concurrent transfers per direction (engine-doc §7).
@@ -48,15 +44,9 @@ public actor SyncEngine {
 
     // MARK: - Download cycle (§4.1)
 
-    /// Applies everything the remote has done since the saved cursor.
-    ///
-    /// With no cursor this is the first-run index of the whole Dropbox; with one
-    /// it is a delta. Longpolling is deliberately *not* here: deciding when to
-    /// ask is the coordinator's job, and this stays a single, cancellable unit of
-    /// work.
-    ///
-    /// - Throws: `SyncFatalError` and connection failures, which stop sync.
-    ///   Per-path failures are recorded as sync issues and never surface here.
+    /// Applies everything the remote has done since the saved cursor: a first-run
+    /// index with no cursor, a delta with one. Throws `SyncFatalError` and
+    /// connection failures; per-path failures become sync issues instead.
     public func downloadCycle() async throws {
         try fileOps.ensureRootPresent()
         defer { fileOps.cleanCacheDir() }
@@ -75,11 +65,9 @@ public actor SyncEngine {
         }
     }
 
-    /// Pages through the listing, applying and then persisting each page.
-    ///
-    /// The cursor is written *after* its page is applied, never before: that
-    /// ordering is what makes an interruption resumable instead of lossy
-    /// (decisions D9.4).
+    /// Pages through the listing, applying and then persisting each page. The
+    /// cursor is written after its page is applied, never before: that ordering
+    /// makes an interruption resumable instead of lossy (decisions D9.4).
     private func runDownloadPages(with applier: DownloadApplier) async throws {
         let savedCursor = try database.stateString(.remoteCursor) ?? ""
         var isIndexing = try database.stateString(.didFinishIndexing) != "1"
@@ -161,11 +149,8 @@ public actor SyncEngine {
     }
 
     /// Runs transfers concurrently, bounded so a large batch cannot open a
-    /// connection per item (engine-doc §7).
-    ///
-    /// A hand-rolled window rather than adding every task up front: a page can
-    /// hold thousands of files, and starting them all would defeat the bound the
-    /// semaphore exists to impose.
+    /// connection per item (engine-doc §7). A hand-rolled window, because adding
+    /// every task up front would defeat the bound the semaphore imposes.
     private func forEachConcurrently(
         _ events: [SyncItemEvent],
         _ body: @escaping @Sendable (SyncItemEvent) async throws -> Void
@@ -220,9 +205,7 @@ public actor SyncEngine {
         do {
             let completion = try await handler()
             // Per path, not per subtree: syncing a folder says nothing about
-            // the files inside it, and clearing their issues here loses both
-            // the message and the retry (note N40). A deletion is the one case
-            // that really does settle a whole subtree.
+            // the files inside it (note N40). A deletion settles a subtree.
             if event.changeType == .removed {
                 try database.clearSyncErrors(pathLower: event.dbxPathLower)
             } else {
@@ -288,14 +271,9 @@ public actor SyncEngine {
 
     // MARK: - Upload cycle (§5.4, §5.5)
 
-    /// Sends one batch of local changes to Dropbox.
-    ///
-    /// The batch arrives raw from the watcher — or synthesised by the catch-up
-    /// scan, which is the same shape on purpose — and is cleaned into one intent
-    /// per path before anything is hashed or sent (§5.3).
-    ///
-    /// - Throws: `SyncFatalError` and connection failures. Per-path failures are
-    ///   recorded as sync issues.
+    /// Sends one batch of local changes to Dropbox. The batch arrives raw from
+    /// the watcher, or synthesised by the catch-up scan in the same shape, and is
+    /// cleaned into one intent per path before anything is hashed (§5.3).
     public func uploadCycle(rawEvents: [RawFSEvent]) async throws {
         guard !rawEvents.isEmpty else { return }
         try fileOps.ensureRootPresent()
@@ -348,10 +326,8 @@ public actor SyncEngine {
     }
 
     /// Turns cleaned filesystem events into sync events, hashing in parallel.
-    ///
-    /// Hashing is the expensive part of the upload direction and it is pure
-    /// local work, so it happens for the whole batch up front rather than one
-    /// file at a time between network calls.
+    /// Hashing is the expensive part of the upload direction and is pure local
+    /// work, so the whole batch is done up front.
     private func convert(_ cleaned: [RawFSEvent]) async throws -> [SyncItemEvent] {
         let admitted = cleaned.filter { !Exclusions.isExcludedName($0.url.lastPathComponent) }
         guard !admitted.isEmpty else { return [] }
@@ -381,13 +357,9 @@ public actor SyncEngine {
         }
     }
 
-    /// Applies a batch in the order of §5.5.
-    ///
-    /// Dropbox offers no transaction, so the sequence of calls *is* the
-    /// correctness argument: deletions first because a creation may want the
-    /// name, directory moves next and one at a time because each takes a whole
-    /// subtree with it, then everything else shallowest-first so a parent always
-    /// exists before its children are sent.
+    /// Applies a batch in the order of §5.5. Dropbox offers no transaction, so
+    /// the sequence of calls is the correctness argument: deletions first,
+    /// directory moves one at a time, then the rest shallowest-first.
     private func applyUploads(_ built: [SyncItemEvent], with applier: UploadApplier) async throws {
         let deletions = built.filter { $0.changeType == .removed }
         let directoryMoves = built.filter { $0.changeType == .moved && $0.itemType == .folder }
@@ -413,11 +385,9 @@ public actor SyncEngine {
 
     // MARK: - Filtering (§8)
 
-    /// Drops what Auster never syncs and what the user deselected.
-    ///
-    /// A deletion is the one thing an exclusion does not suppress: once the item
-    /// is gone from Dropbox there is nothing left to exclude, and keeping the
-    /// entry would silently swallow a future folder of the same name.
+    /// Drops what Auster never syncs and what the user deselected. A deletion is
+    /// the one thing an exclusion does not suppress: once the item is gone there
+    /// is nothing left to exclude, and the entry would swallow a later folder.
     private func admissible(_ entries: [RemoteMetadata]) throws -> [RemoteMetadata] {
         let excluded = excludedItems()
         var retracted: Set<String> = []
@@ -436,10 +406,8 @@ public actor SyncEngine {
     }
 
     /// Removes deleted paths, and everything beneath them, from the stored
-    /// selective-sync set.
-    ///
-    /// The database is the source of truth for the selection (implementation
-    /// note N10); the UI's mirror is Phase 7's to keep in step.
+    /// selective-sync set. The database is the source of truth for the selection
+    /// (note N10); the UI's mirror is Phase 7's to keep in step.
     private func retractExclusions(under retracted: Set<String>) throws {
         let stored = try database.excludedItems()
         let remaining = stored.filter { entry in
@@ -451,12 +419,9 @@ public actor SyncEngine {
 
     // MARK: - Single items (§4)
 
-    /// Fetches one remote path and applies it, recursively for a folder.
-    ///
-    /// Used where a cycle is the wrong unit of work: retrying a path that failed
-    /// last time, and Phase 7's "include this folder again", which has to fetch a
-    /// subtree the cursor has long since moved past. The cursor is untouched — this
-    /// is out-of-band, and advancing it would skip changes the next cycle owes us.
+    /// Fetches one remote path and applies it, recursively for a folder. Used
+    /// where a cycle is the wrong unit of work: retrying a failed path, or
+    /// re-including a folder. The cursor is untouched, this being out-of-band.
     public func fetchRemoteItem(dbxPathLower: String) async throws {
         try fileOps.ensureRootPresent()
         defer { fileOps.cleanCacheDir() }

@@ -9,21 +9,9 @@ public enum PathStoreError: Error, Sendable, Equatable {
     case outsideDropboxFolder(path: String)
 }
 
-/// Translates between local file URLs and Dropbox paths.
-///
-/// The two namespaces disagree in three ways, and every method here exists
-/// because of one of them (engine-doc §9):
-///
-/// - **Case.** Dropbox paths are case-insensitive, so the index is keyed on a
-///   lowercased path while the *cased* path is what the local file is called.
-/// - **Unicode.** Dropbox stores NFC; macOS routinely reports NFD. Two spellings
-///   of "café" are the same file, and treating them as two would duplicate it.
-/// - **Display casing.** `path_display` is only trustworthy for the basename
-///   (api-notes §3), so a fully cased path has to be assembled component by
-///   component.
-///
-/// Copies share the case cache: it is held by reference so that passing a
-/// `PathStore` around does not silently start a second, colder cache.
+/// Translates between local file URLs and Dropbox paths. The two namespaces
+/// disagree about case, Unicode form and display casing (engine-doc §9), and
+/// every method here exists because of one of them.
 public struct PathStore: Sendable {
 
     private let root: URL
@@ -40,12 +28,9 @@ public struct PathStore: Sendable {
 
     // MARK: - Normalization
 
-    /// The index key for a Dropbox path: lowercased and NFC-composed.
-    ///
-    /// Lowercasing happens first and composition second, because lowercasing can
-    /// itself produce decomposed output — U+212B (ANGSTROM SIGN) lowercases to a
-    /// decomposed "å" — and an index key that is not fully composed would not
-    /// match the same file arriving from the other side.
+    /// The index key for a Dropbox path: lowercased, then NFC-composed.
+    /// Lowercasing first, because it can itself produce decomposed output —
+    /// U+212B (ANGSTROM SIGN) lowercases to a decomposed "å".
     public static func normalize(_ dbxPath: String) -> String {
         dbxPath.lowercased().precomposedStringWithCanonicalMapping
     }
@@ -59,14 +44,9 @@ public struct PathStore: Sendable {
 
     // MARK: - Local ↔ Dropbox
 
-    /// The Dropbox path for a local URL, preserving the on-disk casing.
-    ///
-    /// The Dropbox root is `""`, not `"/"` — the API rejects the latter
-    /// (api-notes §2).
-    ///
-    /// - Throws: `PathStoreError.outsideDropboxFolder` when the URL is not under
-    ///   the root. Containment is checked component-wise, so a sibling folder
-    ///   whose name merely starts with the root's name is correctly rejected.
+    /// The Dropbox path for a local URL, preserving the on-disk casing. The
+    /// Dropbox root is `""`, not `"/"` (api-notes §2). Throws
+    /// `PathStoreError.outsideDropboxFolder`, checked component-wise.
     public func toDbxPath(localURL: URL) throws -> String {
         let components = localURL.standardizedFileURL.pathComponents
         let rootComponents = root.pathComponents
@@ -82,12 +62,9 @@ public struct PathStore: Sendable {
         return "/" + relative.joined(separator: "/").precomposedStringWithCanonicalMapping
     }
 
-    /// The local URL for a correctly cased Dropbox path.
-    ///
-    /// Built lexically: the one-argument `appendingPathComponent` stats the path
-    /// to decide whether to append a trailing slash, which would give a folder
-    /// one URL before it exists and a different one after — and the FS-event
-    /// ignore filter compares these against what the watcher reports.
+    /// The local URL for a correctly cased Dropbox path, built lexically: the
+    /// one-argument `appendingPathComponent` stats the path, and would give a
+    /// folder one URL before it exists and a different one after.
     public func toLocalURL(dbxPathCased: String) -> URL {
         let relative = dbxPathCased.split(separator: "/", omittingEmptySubsequences: true)
         return relative.reduce(root) { $0.appendingPathComponent(String($1), isDirectory: false) }
@@ -95,17 +72,9 @@ public struct PathStore: Sendable {
 
     // MARK: - Case correction
 
-    /// Fills in the casing of a path's parent components, given a path whose
-    /// *basename* is already correctly cased.
-    ///
-    /// Resolution order per ancestor is cache → index → one `metadata` call
-    /// (engine-doc §9); an ancestor that exists in none of them keeps the casing
-    /// it arrived with, because a guess is better than refusing to place the
-    /// file. Every resolved ancestor is cached, so a folder full of new files
-    /// costs one network call, not one per file.
-    ///
-    /// - Throws: whatever the metadata call threw. A connection failure must not
-    ///   quietly become a mis-cased path.
+    /// Fills in the casing of a path's parent components, given a correctly cased
+    /// basename: cache → index → one `metadata` call (engine-doc §9), each result
+    /// cached. An unknown ancestor keeps the casing it arrived with.
     public func correctCase(_ dbxPathBasenameCased: String) async throws -> String {
         let components = dbxPathBasenameCased.split(separator: "/", omittingEmptySubsequences: true)
         guard components.count > 1 else { return dbxPathBasenameCased }
@@ -143,15 +112,9 @@ public struct PathStore: Sendable {
 
     // MARK: - Volume probing
 
-    /// Whether the volume holding `url` distinguishes `A` from `a`.
-    ///
-    /// Asked rather than assumed: APFS ships case-insensitive but can be
-    /// formatted either way, and the answer decides whether a remote rename that
-    /// only changes case is a local no-op or a real move.
-    ///
-    /// Probes by writing a file and asking for it under a different casing.
-    /// If the probe cannot be written at all, the answer is `false` — the
-    /// conservative one, since it makes the engine treat more names as colliding.
+    /// Whether the volume holding `url` distinguishes `A` from `a`. Asked rather
+    /// than assumed, by writing a file and asking for it under another casing; an
+    /// unwritable probe answers `false`, the conservative direction.
     public static func isCaseSensitiveVolume(at url: URL) -> Bool {
         let probe = url.appendingPathComponent(".auster-case-probe-\(UUID().uuidString)")
         guard (try? Data().write(to: probe)) != nil else { return false }
@@ -165,11 +128,8 @@ public struct PathStore: Sendable {
     // MARK: - Conflicted copies
 
     /// A free name for a Dropbox-style conflicted copy: `"name (suffix).ext"`,
-    /// gaining ` (1)`, ` (2)`… until nothing is in the way (engine-doc §4.4).
-    ///
-    /// The extension is preserved so the copy still opens in the same
-    /// application, and a leading dot is treated as part of the name rather than
-    /// as an extension — `.bashrc` is not a file called "" of type "bashrc".
+    /// gaining ` (1)`, ` (2)`… until nothing is in the way (engine-doc §4.4). A
+    /// leading dot is part of the name, not an extension.
     public static func conflictedCopyName(for localURL: URL, suffix: String) -> URL {
         let directory = localURL.deletingLastPathComponent()
         let (stem, dotExtension) = splitName(localURL.lastPathComponent)
@@ -197,13 +157,9 @@ public struct PathStore: Sendable {
     }
 }
 
-/// The bounded cache behind `PathStore.correctCase`.
-///
-/// A reference type so every copy of a `PathStore` shares one cache, and
-/// `Mutex`-guarded because the download workers resolve paths concurrently.
-/// Eviction is oldest-insertion-first rather than true LRU: entries are folder
-/// casings, which are cheap to re-derive and rarely re-read once a folder has
-/// been walked.
+/// The bounded cache behind `PathStore.correctCase`. A reference type so every
+/// copy of a `PathStore` shares one, and `Mutex`-guarded because the download
+/// workers resolve paths concurrently. Eviction is oldest-insertion-first.
 final class CaseCache: Sendable {
 
     /// Roughly the ceiling Maestral used (engine-doc §9). Large enough that a

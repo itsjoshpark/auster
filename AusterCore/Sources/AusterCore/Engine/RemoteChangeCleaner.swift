@@ -1,15 +1,8 @@
 import Foundation
 
 /// Collapses a page of Dropbox changes to at most one event per path
-/// (engine-doc §4.2).
-///
-/// Dropbox only promises that applying a delta's entries *in order* reproduces
-/// server state, and a busy page can carry a dozen writes to the same file.
-/// Applying every one of them would download the same path repeatedly, so only
-/// the last survives — with one exception, which is the whole reason this is not
-/// a one-line `Dictionary(_:uniquingKeysWith:)`: if the surviving entry is a
-/// different *kind* of thing than the index has, the old item has to be deleted
-/// first, or the new one would find a directory (or a file) in its way.
+/// (engine-doc §4.2). Only the last write to a path survives — unless it is a
+/// different kind of thing than the index has, which needs a delete first.
 public enum RemoteChangeCleaner {
 
     /// - Returns: the surviving entries, in the order of each path's last
@@ -41,11 +34,8 @@ public enum RemoteChangeCleaner {
     }
 
     /// The tombstone that has to precede `entry`, or `nil` when the index agrees
-    /// with it about what lives at that path.
-    ///
-    /// The tombstone describes the item the *index* knows, casing included: that
-    /// casing is what the local delete checks itself against before removing
-    /// anything (§4.8).
+    /// about what lives at that path. It describes the item the index knows,
+    /// casing included, which the local delete checks itself against (§4.8).
     private static func syntheticDeletion(
         before entry: RemoteMetadata,
         pathLower: String,

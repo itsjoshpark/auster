@@ -1,10 +1,9 @@
 import AusterCore
 import SwiftUI
 
-/// How a completed sync event is presented (ux §2 item 10, §7).
-///
-/// Pure and separate from the view, like `StatusIcon`: these are the whole
-/// content of a row somebody scans rather than reads.
+/// How a completed sync event is presented (ux §2 item 10, §7). Pure and
+/// separate from the view, like `StatusIcon`: these are the whole content of a
+/// row somebody scans rather than reads.
 enum RecentChangePresentation {
 
     /// Maestral showed the last thirty, and thirty is about what fits before a
@@ -33,11 +32,9 @@ enum RecentChangePresentation {
     }
 }
 
-/// The Recent Changes window of ux §2 item 10 and §7.
-///
-/// A window rather than a section inside the menu, as Maestral had it: the list
-/// is thirty rows deep and is read, scrolled and compared against, which a
-/// panel that dismisses the moment focus moves is a bad place to do.
+/// The Recent Changes window of ux §2 item 10 and §7. The list is thirty rows
+/// deep and gets scrolled and compared against, which a panel that dismisses the
+/// moment focus moves is a bad place for.
 struct RecentChangesWindow: View {
 
     static let id = "recent-changes"

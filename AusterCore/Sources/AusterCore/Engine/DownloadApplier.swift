@@ -1,13 +1,8 @@
 import Foundation
 
-/// Applies one remote change to the local folder (engine-doc §4.6–§4.8).
-///
-/// The order of operations is the algorithm: casing first, then the conflict
-/// decision, then the parent, then the write — and the write itself is staged,
-/// re-checked and moved atomically, because a download is the longest window in
-/// the engine during which the user can change the very file being replaced.
-/// Nothing here overwrites a local item it has not first accounted for
-/// (decisions D9).
+/// Applies one remote change to the local folder (engine-doc §4.6–§4.8). The
+/// order is the algorithm: casing, conflict decision, parent, then a staged
+/// write moved atomically. Nothing overwrites what it has not accounted for.
 struct DownloadApplier: Sendable {
 
     let service: DropboxService
@@ -49,11 +44,9 @@ struct DownloadApplier: Sendable {
         )
     }
 
-    /// Applies `event`, reporting what happened.
-    ///
-    /// - Throws: only what cannot be attributed to this one path — a lost
-    ///   connection, a missing Dropbox folder. Per-path failures are the
-    ///   caller's to record.
+    /// Applies `event`, reporting what happened. Throws only what cannot be
+    /// attributed to this one path — a lost connection, a missing Dropbox folder;
+    /// per-path failures are the caller's to record.
     @discardableResult
     func apply(_ event: SyncItemEvent) async throws -> SyncCompletion {
         // 1. Casing first (§4.6 step 1). Everything after this assumes the local
@@ -109,11 +102,9 @@ struct DownloadApplier: Sendable {
 
     // MARK: - Casing (§4.6 step 1)
 
-    /// Renames the local item when the remote has recased it.
-    ///
-    /// A pure Unicode-normalization difference is *not* a rename: macOS and
-    /// Dropbox disagree about composition for the same name, and acting on that
-    /// would rename the file back and forth forever (§9).
+    /// Renames the local item when the remote has recased it. A pure
+    /// Unicode-normalization difference is not a rename: acting on it would
+    /// rename the file back and forth forever (§9).
     private func applyCaseChange(for event: SyncItemEvent) throws {
         guard let index = try database.indexEntry(forPathLower: event.dbxPathLower) else { return }
         let previous = index.dbxPathCased
@@ -139,9 +130,8 @@ struct DownloadApplier: Sendable {
     // MARK: - Conflicted copies (§4.4)
 
     /// Moves the local item aside under a Dropbox-style conflicted-copy name and
-    /// asks for it to be rescanned, so it uploads as a new file.
-    ///
-    /// Nothing is destroyed here: that is the entire point of the rename.
+    /// asks for it to be rescanned, so it uploads as a new file. Nothing is
+    /// destroyed: that is the entire point of the rename.
     private func preserveAsConflictedCopy(at localURL: URL) throws {
         guard FileManager.default.fileExists(atPath: localURL.path) else { return }
 
@@ -152,10 +142,10 @@ struct DownloadApplier: Sendable {
 
     /// `"<Owner>'s conflicted copy YYYY-MM-DD"`, or the ownerless form.
     static func conflictedCopySuffix(owner: String?, on date: Date = Date()) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        let day = formatter.string(from: date)
+        // The local zone, not UTC: the date belongs to the user's day, and
+        // `.iso8601` defaults to GMT.
+        let format = Date.ISO8601FormatStyle(dateSeparator: .dash, timeZone: .current)
+        let day = date.formatted(format.year().month().day())
 
         guard let owner, !owner.isEmpty else { return "conflicted copy \(day)" }
         return "\(owner)'s conflicted copy \(day)"
@@ -233,11 +223,9 @@ struct DownloadApplier: Sendable {
         cacheHash(downloaded.contentHash ?? event.contentHash, at: event.localURL)
     }
 
-    /// `min(clientModified, serverModified, now)` (§4.6 step 6).
-    ///
-    /// `client_modified` is whatever the uploading client claimed, so it is
-    /// clamped: a wrong clock somewhere else must not date the user's file in
-    /// the future.
+    /// `min(clientModified, serverModified, now)` (§4.6 step 6). `client_modified`
+    /// is whatever the uploading client claimed, so it is clamped: a wrong clock
+    /// somewhere else must not date the user's file in the future.
     static func localModificationDate(for file: RemoteFile, now: Date = Date()) -> Date {
         min(file.clientModified, file.serverModified, now)
     }
@@ -298,10 +286,8 @@ struct DownloadApplier: Sendable {
 }
 
 /// Creates the folders an incoming item needs, one at a time (engine-doc §4.3).
-///
 /// An actor because file events are applied in parallel: two downloads into the
-/// same not-yet-created folder would otherwise both decide to create it, and one
-/// of them would fail.
+/// same missing folder would otherwise both create it, and one would fail.
 actor ParentFolderCreator {
 
     private let service: DropboxService

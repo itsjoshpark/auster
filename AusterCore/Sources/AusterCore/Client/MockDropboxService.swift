@@ -1,29 +1,8 @@
 import Foundation
 
-/// An in-memory Dropbox.
-///
-/// This is the remote the whole engine is tested against, so it aims for
-/// *behavioural* fidelity to the real service rather than completeness — the
-/// places where Dropbox is surprising are exactly the places the engine has to
-/// get right (api-notes §2, §3):
-///
-/// - Moves are never reported as moves. The change log gets a tombstone at the
-///   old path and a fresh entry at the new one.
-/// - A folder delete reports only the folder. Children vanish without their own
-///   tombstones, so a client has to consult its own index to know what went.
-/// - A tombstone says nothing about whether the deleted entry was a file or a
-///   folder.
-/// - `.update(rev:)` against a moved-on revision does not fail: with
-///   `autorename`, the server writes a conflicted copy and leaves the original
-///   alone. That is what makes a lost update impossible (decisions D9.1).
-/// - Uploading into a folder that does not exist creates the parents.
-///
-/// It lives in the main target rather than the test target so later phases can
-/// grow scenario helpers on it.
-///
-/// Thread safety: every operation takes one lock for its whole duration, which
-/// makes each call atomic with respect to the others — matching the guarantee a
-/// single Dropbox API call gives.
+/// An in-memory Dropbox, aiming at behavioural fidelity rather than
+/// completeness: moves arrive as a tombstone plus a new entry, folder deletes
+/// report only the folder, and a stale-rev update conflicts rather than failing.
 public final class MockDropboxService: DropboxService, @unchecked Sendable {
 
     /// The routes a test can inject a failure into.
@@ -129,12 +108,9 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
         set { lock.withLock { storedLongpollBackoff = newValue } }
     }
 
-    /// Emits every page's entries back to front.
-    ///
-    /// Dropbox promises only that applying a page *in order* reproduces server
-    /// state — not that parents precede their children. Setting this proves the
-    /// engine's own ordering (engine-doc §4.3) is what puts folders first,
-    /// rather than the listing happening to arrive that way.
+    /// Emits every page's entries back to front. Dropbox promises only that a
+    /// page applied in order reproduces server state, so this proves the engine's
+    /// own ordering (engine-doc §4.3) is what puts folders first.
     public var reversesListingOrder: Bool {
         get { lock.withLock { storedReversesListingOrder } }
         set { lock.withLock { storedReversesListingOrder = newValue } }
@@ -146,10 +122,9 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
         lock.withLock { recorded }
     }
 
-    /// Every upload, with the arguments the engine chose.
-    ///
-    /// The write mode is the whole safety story of an upload (api-notes §2), so
-    /// asserting on it is asserting that a lost update is impossible.
+    /// Every upload, with the arguments the engine chose. The write mode is the
+    /// whole safety story of an upload (api-notes §2), so asserting on it is
+    /// asserting that a lost update is impossible.
     public var recordedUploads: [(path: String, mode: WriteMode, clientModified: Date)] {
         lock.withLock { uploads }
     }
@@ -170,10 +145,8 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
         lock.withLock { folderCreations }
     }
 
-    /// Makes the next `times` calls to `call` throw `error`.
-    ///
-    /// Failures are queued per route, so injecting an upload failure leaves
-    /// listings alone.
+    /// Makes the next `times` calls to `call` throw `error`. Failures are queued
+    /// per route, so injecting an upload failure leaves listings alone.
     public func failNext(_ call: Call, with error: DropboxServiceError, times: Int = 1) {
         lock.withLock {
             pendingFailures[call, default: []].append(contentsOf: Array(repeating: error, count: times))
@@ -213,11 +186,9 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
         }
     }
 
-    /// Puts a symlink into the remote.
-    ///
-    /// Dropbox stores a symlink as file metadata carrying `symlink_info`, with
-    /// no content worth downloading — which is what lets the engine reproduce it
-    /// without a transfer (engine-doc §4.6 step 4).
+    /// Puts a symlink into the remote. Dropbox stores one as file metadata
+    /// carrying `symlink_info` with no content worth downloading, which lets the
+    /// engine reproduce it without a transfer (engine-doc §4.6 step 4).
     @discardableResult
     public func seedSymlink(at path: String, target: String) -> RemoteFile {
         lock.withLock {
@@ -302,11 +273,8 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
             try enter(.listFolder)
             let root = Self.key(for: path)
             // Dropbox answers a listing of a path that is not a folder with
-            // `path/not_found` or `path/not_folder`; it does not treat "no
-            // entries under this prefix" as an empty folder. An engine tested
-            // only against the lenient answer would never meet the strict one
-            // (found by the integration suite, note N39). The root is the one
-            // path that always exists, even on an empty account.
+            // `path/not_found` or `path/not_folder` (note N39). The root is the
+            // one path that always exists, even on an empty account.
             if !root.isEmpty {
                 guard let node = nodes[root] else {
                     throw DropboxServiceError.notFound(path: Self.normalized(path))
@@ -629,10 +597,8 @@ public final class MockDropboxService: DropboxService, @unchecked Sendable {
     }
 
     /// Removes an entry and everything beneath it, leaving tombstones for the
-    /// children.
-    ///
-    /// - Returns: the removed descendants, keyed by path, so a move can put the
-    ///   subtree back down under its new parent.
+    /// children. Returns the removed descendants keyed by path, so a move can put
+    /// the subtree back down under its new parent.
     @discardableResult
     private func remove(subtreeAt key: String) -> [String: Node] {
         var descendants: [String: Node] = [:]

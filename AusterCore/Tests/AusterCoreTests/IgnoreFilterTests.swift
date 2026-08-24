@@ -4,13 +4,8 @@ import Testing
 @testable import AusterCore
 
 /// The mechanism that stops the engine hearing its own footsteps (engine-doc
-/// §5.2).
-///
-/// FSEvents cannot say who wrote a file, so every mutation the engine makes is
-/// declared first and the echo is dropped. Get this wrong in one direction and
-/// every download immediately re-uploads itself; wrong in the other and a real
-/// user edit is swallowed. Both failures are silent, which is why the matching
-/// rules are pinned here rather than inferred from the monitor's behaviour.
+/// §5.2). Wrong one way, every download re-uploads itself; wrong the other, a
+/// real user edit is swallowed.
 @Suite("IgnoreFilter")
 struct IgnoreFilterTests {
 

@@ -3,17 +3,9 @@ import Testing
 
 @testable import AusterCore
 
-/// The FSEvents watcher, exercised against a real temp directory.
-///
-/// Deliberately integration-style: the thing worth testing here is that macOS
-/// actually delivers what the decoder expects, which a fake event source could
-/// never tell us. Assertions stay tolerant about *which* shape a rename arrives
-/// in — engine-doc's design assumes imperfect flag decoding and repairs it in
-/// the cleaning stage, so pinning an exact decoding would test the OS, not the
-/// engine.
-///
-/// Serialized: each test drives a live event stream with real timing, and
-/// running them concurrently makes the settle windows fight for the machine.
+/// The FSEvents watcher against a real temp directory: what matters is that
+/// macOS delivers what the decoder expects. Serialized, because each test drives
+/// a live event stream with real timing.
 @Suite("LocalFileMonitor", .serialized)
 struct LocalFileMonitorTests {
 

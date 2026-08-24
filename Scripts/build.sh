@@ -1,7 +1,5 @@
 #!/bin/bash
-#
 # build.sh — build AusterCore and the app.
-#
 # Usage: Scripts/build.sh [Debug|Release]   (default: Debug)
 
 set -euo pipefail

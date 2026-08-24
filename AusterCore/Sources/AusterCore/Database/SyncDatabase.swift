@@ -2,33 +2,20 @@ import Foundation
 import GRDB
 
 /// The sync engine's persistent state: the index, the hash cache, sync errors,
-/// history, and a small key/value store for cursors and flags (engine-doc §1).
-///
-/// Everything here is *reconstructible*. That is the premise the whole class
-/// leans on: if SQLite cannot open or migrate the file, the right move is to
-/// throw the file away and re-index rather than to fail the launch
-/// (engine-doc §9), so `init` never surfaces a corruption error — it reports it
-/// through `wasResetOnOpen` instead.
-///
-/// A `DatabasePool` (WAL) backs it, so the download and upload workers can read
-/// concurrently while one writes.
+/// history, and a key/value store for cursors (engine-doc §1). All of it is
+/// reconstructible, so corruption is reported by `wasResetOnOpen`, not thrown.
 public final class SyncDatabase: Sendable {
 
     private let pool: DatabasePool
 
-    /// `true` when the file on disk was unusable and had to be recreated empty.
-    /// The caller must then treat the index as absent and reindex.
-    ///
-    /// Deviation from the phase file, which spells this `private(set) var`: a
-    /// `Sendable` class cannot hold mutable state without isolation, and this is
-    /// only ever set during `init`.
+    /// `true` when the file on disk was unusable and had to be recreated empty;
+    /// the caller must then treat the index as absent and reindex. A `let`
+    /// because a `Sendable` class cannot hold mutable state without isolation.
     public let wasResetOnOpen: Bool
 
     /// Opens (or creates) the database at `path`, migrating it to the current
-    /// schema.
-    ///
-    /// - Throws: only if a *fresh* database also cannot be created — at which
-    ///   point the problem is the filesystem, not the data.
+    /// schema. Throws only if a fresh database also cannot be created, at which
+    /// point the problem is the filesystem rather than the data.
     public init(path: String) throws {
         var configuration = Configuration()
         // Under contention SQLite would otherwise fail the write immediately;
@@ -136,10 +123,9 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    /// Every entry at or beneath `pathLower`, inclusive.
-    ///
-    /// "Beneath" means a path-component boundary: `/a` covers `/a/b` but never
-    /// `/ab`. Passing the root (`""` or `"/"`) returns everything.
+    /// Every entry at or beneath `pathLower`, inclusive. "Beneath" means a
+    /// path-component boundary: `/a` covers `/a/b` but never `/ab`. The root
+    /// (`""` or `"/"`) returns everything.
     public func indexEntries(underPathLower pathLower: String) throws -> [IndexEntry] {
         try pool.read { db in
             guard let (sql, arguments) = Self.subtreeCondition(pathLower) else {
@@ -179,11 +165,9 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    /// The `WHERE` fragment selecting a subtree, or `nil` for the root (which
-    /// needs no filter at all).
-    ///
-    /// Paths are user data and routinely contain `%` and `_`, so the descendant
-    /// half escapes them: without that, `/100%` would also match `/100x/…`.
+    /// The `WHERE` fragment selecting a subtree, or `nil` for the root. Paths are
+    /// user data and routinely contain `%` and `_`, so the descendant half
+    /// escapes them: without that, `/100%` would also match `/100x/…`.
     private static func subtreeCondition(_ pathLower: String) -> (String, StatementArguments)? {
         guard pathLower != "", pathLower != "/" else { return nil }
         let prefix = pathLower.hasSuffix("/") ? String(pathLower.dropLast()) : pathLower
@@ -203,11 +187,9 @@ public final class SyncDatabase: Sendable {
 
     // MARK: - Hash cache
 
-    /// The cached content hash for a file, or `nil` when there is none *or* the
-    /// file has been written since it was cached (engine-doc §1.2).
-    ///
-    /// The inode is the key rather than the path so a rename does not throw away
-    /// a perfectly good hash; the mtime is what makes the entry stale.
+    /// The cached content hash for a file, or `nil` when there is none or the
+    /// file has been written since (engine-doc §1.2). The inode is the key so a
+    /// rename keeps the hash; the mtime is what makes the entry stale.
     public func cachedHash(inode: UInt64, mtime: Date) throws -> String? {
         try pool.read { db in
             guard let record = try HashCacheRecord.fetchOne(db, key: Self.column(inode)) else {
@@ -252,10 +234,8 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    /// Clears the error for a path and everything under it.
-    ///
-    /// Subtree semantics matter here: re-syncing a folder should clear the
-    /// issues of the children it is about to retry, not just its own.
+    /// Clears the error for a path and everything under it: re-syncing a folder
+    /// should clear the issues of the children it is about to retry.
     public func clearSyncErrors(pathLower: String) throws {
         try pool.write { db in
             guard let (sql, arguments) = Self.subtreeCondition(pathLower) else {
@@ -266,12 +246,9 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    /// Clears the error for exactly one path, leaving anything under it.
-    ///
-    /// Syncing a folder does not sync what is inside it, so a folder that
-    /// succeeds must not take its children's issues with it — a child that is
-    /// still missing has to keep its error, or the startup sequence stops
-    /// retrying it and the interface reports that all is well (note N40).
+    /// Clears the error for exactly one path, leaving anything under it: a
+    /// folder that syncs does not sync its children, so a child still missing
+    /// keeps its error and stays in the retry (note N40).
     public func clearSyncError(exactPathLower: String) throws {
         try pool.write { db in
             let matching = SyncErrorRecord.filter(
@@ -320,10 +297,8 @@ public final class SyncDatabase: Sendable {
     }
 
     /// Trims the log to a retention window and a hard ceiling (engine-doc §1.4:
-    /// one week, at most 1000 entries).
-    ///
-    /// Both bounds are applied — a quiet week must not leave one stale entry
-    /// visible, and a busy hour must not leave ten thousand.
+    /// one week, at most 1000 entries). Both bounds apply — a quiet week must
+    /// not leave a stale entry, a busy hour must not leave ten thousand.
     public func pruneHistory(olderThan cutoff: Date, keepAtMost limit: Int) throws {
         try pool.write { db in
             _ = try HistoryRecord.filter(
@@ -352,11 +327,9 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    /// Sets a state value, or removes the key when `value` is `nil`.
-    ///
-    /// Removing rather than storing an empty string keeps "never set" distinct
-    /// from "set to nothing" — the difference between "never indexed" and an
-    /// empty cursor is the difference between a full re-index and a no-op.
+    /// Sets a state value, or removes the key when `value` is `nil`. Removing
+    /// keeps "never set" distinct from "set to nothing": the difference between
+    /// a full re-index and a no-op.
     public func setState(_ key: StateKey, _ value: String?) throws {
         try pool.write { db in
             guard let value else {
@@ -369,12 +342,9 @@ public final class SyncDatabase: Sendable {
 
     // MARK: - Selective sync
 
-    /// The user's excluded paths, normalized (engine-doc §8).
-    ///
-    /// The database is the source of truth for the selection; `AppConfig` keeps
-    /// a mirror for the UI (implementation note N10). Stored as a JSON array
-    /// because the alternative — a table — would buy nothing for a list that is
-    /// read whole and written whole.
+    /// The user's excluded paths, normalized (engine-doc §8). The database is the
+    /// source of truth and `AppConfig` mirrors it for the UI (note N10); stored
+    /// as a JSON array, being read whole and written whole.
     public func excludedItems() throws -> Set<String> {
         guard let raw = try stateString(.excludedItems),
             let decoded = try? JSONDecoder().decode([String].self, from: Data(raw.utf8))
