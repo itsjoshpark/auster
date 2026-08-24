@@ -12,10 +12,10 @@ struct AuthManagerTests {
 
     // MARK: - Doubles
 
-    private final class FakeLinkStore: DropboxLinkStore {
+    private final class FakeLinkStore: DropboxLinkStore, @unchecked Sendable {
         var authorizationResult: AuthorizationResult = .authorized
         var serviceAfterAuthorization = MockDropboxService()
-        var storedService: MockDropboxService?
+        var stored: MockDropboxService?
 
         /// Simulates authorizing and then finding nothing usable in the keychain.
         var suppressService = false
@@ -23,22 +23,20 @@ struct AuthManagerTests {
         private(set) var requestedScopes: [String]?
         private(set) var clearCount = 0
 
-        var hasStoredCredentials: Bool { storedService != nil }
-
-        func makeService() -> (any DropboxService)? { storedService }
+        func storedService() async -> (any DropboxService)? { stored }
 
         func beginAuthorization(scopes: [String]) { requestedScopes = scopes }
 
         func completeAuthorization(url: URL) async -> AuthorizationResult {
             if case .authorized = authorizationResult, !suppressService {
-                storedService = serviceAfterAuthorization
+                stored = serviceAfterAuthorization
             }
             return authorizationResult
         }
 
         func clearCredentials() {
             clearCount += 1
-            storedService = nil
+            stored = nil
         }
     }
 
@@ -240,7 +238,7 @@ struct AuthManagerTests {
     func restoresStoredLink() async {
         let store = FakeLinkStore()
         personal(store.serviceAfterAuthorization)
-        store.storedService = store.serviceAfterAuthorization
+        store.stored = store.serviceAfterAuthorization
         let manager = AuthManager(store: store)
 
         await manager.restore()
@@ -265,7 +263,7 @@ struct AuthManagerTests {
     func restoreRejectsTeamAccount() async {
         let store = FakeLinkStore()
         team(store.serviceAfterAuthorization)
-        store.storedService = store.serviceAfterAuthorization
+        store.stored = store.serviceAfterAuthorization
         let manager = AuthManager(store: store)
 
         await manager.restore()
@@ -279,7 +277,7 @@ struct AuthManagerTests {
     func restoreSurvivesOfflineLaunch() async {
         let store = FakeLinkStore()
         personal(store.serviceAfterAuthorization)
-        store.storedService = store.serviceAfterAuthorization
+        store.stored = store.serviceAfterAuthorization
         store.serviceAfterAuthorization.failNext(.currentAccount, with: .connection)
         let manager = AuthManager(store: store)
 
@@ -295,7 +293,7 @@ struct AuthManagerTests {
     func restoreUnlinksOnRevokedToken() async {
         let store = FakeLinkStore()
         personal(store.serviceAfterAuthorization)
-        store.storedService = store.serviceAfterAuthorization
+        store.stored = store.serviceAfterAuthorization
         store.serviceAfterAuthorization.failNext(.currentAccount, with: .notAuthorized)
         let manager = AuthManager(store: store)
 

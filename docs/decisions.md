@@ -542,3 +542,25 @@ same thing in words (`ActivityLine`, e.g. "↓ report.pdf — 42%"), which is wh
 ux §2 item 7 described anyway. And `Rebuild Index…` cannot use
 `.confirmationDialog`, because menu content is not a view hierarchy for a sheet
 to attach to — it runs an `NSAlert` with the same copy.
+
+### N43. The keychain read is not on the main actor
+`DropboxLinkStore` was a `@MainActor` protocol, so `hasStoredCredentials` and
+`makeService()` both ran there — and both reach the keychain through
+`DropboxOAuthManager`, whose `SecItemCopyMatching` blocks the calling thread
+until the user answers the system permission dialog.
+
+macOS ties a keychain item's ACL to the app's code signature, so every change of
+signature invalidates it and raises that prompt: each ad-hoc rebuild during
+development, and each Sparkle update in the field. With the read on the main
+actor the whole app parked behind the dialog — no menu bar icon, since the
+`MenuBarExtra` scene could not build its label, no windows, no sync, and nothing
+on screen to say why.
+
+The two members are now one nonisolated `storedService() async`, which does the
+work on a detached task; `KeychainDropboxLinkStore` is non-isolated and
+`@unchecked Sendable`, which is sound because everything it holds is immutable
+after `init` and `SecItem*` is thread-safe. Only the members that genuinely need
+the main actor — the ones that open a browser — still declare it.
+
+The prompt still appears. What changed is that the app stays responsive behind
+it and starts syncing the moment it is answered.

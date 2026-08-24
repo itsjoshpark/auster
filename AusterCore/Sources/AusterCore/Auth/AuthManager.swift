@@ -71,7 +71,7 @@ public final class AuthManager {
             return .failed(message)
 
         case .authorized:
-            guard let service = store.makeService() else {
+            guard let service = await store.storedService() else {
                 discardLink()
                 return .failed("Dropbox authorized Auster but did not return any credentials.")
             }
@@ -95,7 +95,7 @@ public final class AuthManager {
     /// is not being unlinked, so only a token the server has rejected clears the
     /// link — nothing but re-linking will fix that.
     public func restore() async {
-        guard store.hasStoredCredentials, let service = store.makeService() else {
+        guard let service = await store.storedService() else {
             discardLink()
             return
         }
