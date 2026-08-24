@@ -6,12 +6,12 @@ no baked-in effects — the system supplies specular highlights, refraction, and
 shadows.
 
 **Concept:** Auster is the Latin south wind. A wind glyph drafted from clean
-primitives — three thick horizontal gusts built from straight segments joined
+primitives — three horizontal gusts built from straight segments joined
 tangent-continuously to perfect circular-arc curls, uniform stroke width,
 round caps — over a solid deep sea-green field (`#0E5A50`, chosen by Josh
 2026-08-22). No text, legible down to 16 px.
 
-![preview](preview@512.png)
+![preview](AppIcon-iOS-Default-256@1x.png)
 
 ## Files
 
@@ -19,7 +19,7 @@ round caps — over a solid deep sea-green field (`#0E5A50`, chosen by Josh
 |---|---|
 | `AppIcon.icon/` | **The Icon Composer document** (a package: `icon.json` + `Assets/`). Open it directly in Icon Composer; add it to the Xcode project as the app icon (Xcode 26+ consumes `.icon` directly). |
 | `AppIcon.icon/Assets/wind-{back,middle,front}.svg` | The three foreground layers — 1024×1024, fully opaque white, effect-free |
-| `preview.svg` / `preview@512.png` | **Reference only** — flattened approximation with gradient, opacities, and corner mask baked in. Not an input to Icon Composer. |
+| `AppIcon-iOS-Default-{64,256}@1x.png` | Icon Composer's own export of the default appearance, Liquid Glass included — what the READMEs show. Not an input; re-export after changing the layers. |
 | `generate.py` | Regenerates the layer SVGs (parametric geometry) |
 
 The `.icon` document already encodes what the HIG says to configure in Icon
@@ -46,10 +46,14 @@ small sizes (16/32 px) in Icon Composer before shipping.
 
 ## Regenerating / tweaking
 
-`python3 generate.py` rewrites `AppIcon.icon/Assets/*.svg` and `preview.svg`
-(render the PNG preview with `qlmanage -t -s 512 -o . preview.svg`). Stroke
-geometry (run lengths, curl radii/sweep, stroke width, vertical rhythm,
-optical-centering shifts) is parametrized at the bottom of the script.
+`python3 generate.py` rewrites `AppIcon.icon/Assets/*.svg`. Stroke geometry
+(run lengths, curl radii/sweep, stroke width, vertical rhythm, optical-centering
+shifts) is parametrized at the bottom of the script.
+
+Copy the layers to `Auster/AppIcon.icon/Assets/` and re-export the PNGs from
+Icon Composer afterwards. Only Icon Composer renders the Liquid Glass treatment,
+so a flattened render from the SVGs would show the geometry without the material
+and misrepresent the icon.
 
 ## HIG conformance checklist
 
