@@ -14,25 +14,24 @@ struct OnboardingModelTests {
 
     /// A link store that authorizes on demand, so the wizard can be walked
     /// without a browser.
-    private final class FakeLinkStore: DropboxLinkStore {
+    private final class FakeLinkStore: DropboxLinkStore, @unchecked Sendable {
         var result: AuthorizationResult = .authorized
         let mock = MockDropboxService()
-        var storedService: MockDropboxService?
+        var stored: MockDropboxService?
         private(set) var clearCount = 0
         private(set) var beganAuthorization = false
 
-        var hasStoredCredentials: Bool { storedService != nil }
-        func makeService() -> (any DropboxService)? { storedService }
+        func storedService() async -> (any DropboxService)? { stored }
         func beginAuthorization(scopes: [String]) { beganAuthorization = true }
 
         func completeAuthorization(url: URL) async -> AuthorizationResult {
-            if case .authorized = result { storedService = mock }
+            if case .authorized = result { stored = mock }
             return result
         }
 
         func clearCredentials() {
             clearCount += 1
-            storedService = nil
+            stored = nil
         }
     }
 
