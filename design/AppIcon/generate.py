@@ -9,7 +9,7 @@ caps). No freeform curves — geometry stays crisp like a drafted symbol.
 import math, os
 
 W = 1024          # canvas
-HALF = 38         # half stroke width (stroke = 76)
+HALF = 32         # half stroke width (stroke = 64)
 
 def centerline(y, x0, x1, curl=None, arc_steps=140):
     """Horizontal line (x0..x1 at height y), then optional curl.
