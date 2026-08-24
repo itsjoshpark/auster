@@ -564,3 +564,26 @@ the main actor — the ones that open a browser — still declare it.
 
 The prompt still appears. What changed is that the app stays responsive behind
 it and starts syncing the moment it is answered.
+
+### N44. Failed paths are retried on a loop, not only at startup
+A `SyncItemError` is documented as "retried on the next pass over that path",
+and for a path whose *remote* keeps changing that is what happened. For every
+other path there was no next pass. A download that failed for a local reason —
+a folder the user made read-only, a full disk — waits on a remote change that is
+never coming, and an upload that failed waits on a file the user has finished
+editing. Both stood until the next launch, where the startup sequence picked
+them up. On a machine that is never quit, that is never.
+
+`SyncCoordinator` now runs a fifth loop over `sync_errors`. A download is
+re-fetched out of band; an upload is re-offered to the watcher through the
+`rescanRequested` hook the engine already uses for conflicted copies, so the
+retry takes the same debounced, batched route a user's own edit takes. The
+interval starts at a minute and doubles to a half-hour ceiling while the set of
+failing paths stands unchanged, returning to the floor as soon as it moves.
+
+Retrying on a loop is only tolerable if it stays quiet, so `finishCycle` no
+longer notifies a path that is already failing with the same message. A
+different message is still news, standing issues remain listed in the
+sync-issues window either way, and issues carried over from the last run are
+seeded into that set at startup — a relaunch is not a reason to report them all
+again.

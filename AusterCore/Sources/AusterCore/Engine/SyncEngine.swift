@@ -447,6 +447,13 @@ public actor SyncEngine {
         try await applyPage(entries, with: applier, indexing: false)
     }
 
+    /// Re-offers one local path to the upload direction, for retrying a path
+    /// whose upload failed. The event goes to the watcher rather than straight
+    /// to a cycle, so the retry takes exactly the route a user's own edit takes.
+    public func retryLocalItem(dbxPathCased: String) {
+        events.rescanRequested(pathStore.toLocalURL(dbxPathCased: dbxPathCased))
+    }
+
     // MARK: - Selective sync (§8)
 
     /// Takes a newly excluded subtree out of the local folder and the index.
