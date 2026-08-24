@@ -254,6 +254,7 @@ struct MenuRowMenu<Content: View>: View {
                     .font(.caption2)
                     .foregroundStyle(isHovering ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .contentShape(.rect)
@@ -263,7 +264,8 @@ struct MenuRowMenu<Content: View>: View {
             )
             .foregroundStyle(isHovering ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .onHover { isHovering = $0 }
     }
