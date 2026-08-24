@@ -515,3 +515,30 @@ redirect from the app delegate instead (N6), so no scene should volunteer —
 `defaultLaunchBehavior(.suppressed)` sits alongside it and covers presentation
 at launch. It is *not* sufficient on its own: tried first, and the window still
 appeared on the redirect, which is what narrowed the trigger to external events.
+
+### N42. The menu bar extra is a real menu, not a window
+The menu was built in `.window` style so the status and activity rows could be
+richer than a menu item (ux §2's parenthetical). That bought less than it cost.
+Every row had to be hand-built to look like a menu item — a `MenuRowButton`
+with its own hover highlight — and the snooze submenu ux §2 item 12 asks for
+could not be built at all: a `Menu` in a window is a pop-up button, so it
+needed a click, opened downwards over the rows beneath it, and drew its
+disclosure on the leading edge.
+
+`.menuBarExtraStyle(.menu)` makes the content a real `NSMenu`, where a nested
+`Menu` is a genuine submenu: it opens on hover, flies out to the side, and
+draws its own disclosure. Disabled `Text` rows, `⌘Q`/`⌘,` shortcut columns and
+the selection highlight all come from AppKit too, and ~120 lines of emulation
+went away with them.
+
+The reason for the window turned out not to hold. Menu items track observable
+state *while the menu is open*: with the menu held open and a file dropped into
+the local folder, the status row went "Up to date" → "Syncing…" → "Up to date"
+and the activity rows appeared and cleared. Menu tracking does not starve the
+main actor.
+
+Two things did change. The in-flight rows lose their `ProgressView` and say the
+same thing in words (`ActivityLine`, e.g. "↓ report.pdf — 42%"), which is what
+ux §2 item 7 described anyway. And `Rebuild Index…` cannot use
+`.confirmationDialog`, because menu content is not a view hierarchy for a sheet
+to attach to — it runs an `NSAlert` with the same copy.

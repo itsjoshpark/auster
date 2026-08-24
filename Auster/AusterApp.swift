@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Auster's entry point.
 ///
-/// The app is a menu-bar-only agent (`LSUIElement`): a `MenuBarExtra` in window
-/// style, a `Settings` scene, and two ordinary windows for the things that do
+/// The app is a menu-bar-only agent (`LSUIElement`): a `MenuBarExtra` menu, a
+/// `Settings` scene, and two ordinary windows for the things that genuinely do
 /// not fit in a menu. All sync logic lives in `AusterCore`; this target only
 /// renders state and forwards user intent.
 @main
@@ -21,7 +21,7 @@ struct AusterApp: App {
         } label: {
             StatusIconLabel(environment: environment)
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
 
         Settings {
             SettingsView(environment: environment)
@@ -39,6 +39,16 @@ struct AusterApp: App {
             SyncIssuesWindow(environment: environment)
         }
         .defaultSize(width: 560, height: 360)
+        .defaultLaunchBehavior(.suppressed)
+        .handlesExternalEvents(matching: [])
+
+        // The same two modifiers, for the same reason: any `Window` scene left
+        // eligible is one SwiftUI can present uninvited when the redirect
+        // arrives (note N41).
+        Window("Recent Changes", id: RecentChangesWindow.id) {
+            RecentChangesWindow(environment: environment)
+        }
+        .defaultSize(width: 560, height: 420)
         .defaultLaunchBehavior(.suppressed)
         .handlesExternalEvents(matching: [])
     }
