@@ -20,7 +20,7 @@ enum FatalErrorDialogs {
     /// - Returns: the user's answer, as the recovery model's own vocabulary.
     static func askAboutMissingFolder(configuredFolder: URL) -> RecoveryModel.FolderMissingChoice {
         let alert = NSAlert()
-        alert.messageText = "Your Dropbox folder can't be found"
+        alert.messageText = "Your Dropbox folder can’t be found"
         alert.informativeText = """
             Auster expected it at \(configuredFolder.path). If the folder was \
             moved or renamed, or is on a drive that isn't connected, point Auster \

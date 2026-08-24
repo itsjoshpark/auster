@@ -182,8 +182,8 @@ public final class SyncState {
             usageText = "Usage unknown"
             return
         }
-        let percent = String(format: "%.1f%%", usage.fraction * 100)
-        let total = ByteCountFormatter.string(fromByteCount: usage.allocated, countStyle: .file)
+        let percent = usage.fraction.formatted(.percent.precision(.fractionLength(1)))
+        let total = usage.allocated.formatted(.byteCount(style: .file))
         usageText = "\(percent) of \(total) used"
     }
 

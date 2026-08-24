@@ -12,7 +12,7 @@ struct DonePage: View {
             Spacer()
             OnboardingIcon()
 
-            Text("You're all set")
+            Text("You’re all set")
                 .font(.title)
             Text(
                 """

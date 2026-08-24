@@ -152,10 +152,10 @@ struct DownloadApplier: Sendable {
 
     /// `"<Owner>'s conflicted copy YYYY-MM-DD"`, or the ownerless form.
     static func conflictedCopySuffix(owner: String?, on date: Date = Date()) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        let day = formatter.string(from: date)
+        // The local zone, not UTC: the date belongs to the user's day, and
+        // `.iso8601` defaults to GMT.
+        let format = Date.ISO8601FormatStyle(dateSeparator: .dash, timeZone: .current)
+        let day = date.formatted(format.year().month().day())
 
         guard let owner, !owner.isEmpty else { return "conflicted copy \(day)" }
         return "\(owner)'s conflicted copy \(day)"
