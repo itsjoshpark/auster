@@ -136,3 +136,7 @@ Auster.xcodeproj/xcuserdata/
 
 ## Swift Package Manager — the app resolves into the project workspace
 Auster.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
+
+## Python — the icon generators are run in place
+__pycache__/
+*.py[cod]

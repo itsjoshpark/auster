@@ -21,9 +21,12 @@ import math, os
 
 VB = 36.0
 HALF = 2.5            # half stroke width (stroke = 5)
-BADGE_C = (28.5, 26.5)
-BADGE_R = 7.2         # knockout radius
-BADGE_r = 5.4         # badge artwork radius
+BADGE_C = (28.5, 27.0)
+BADGE_R = 8.3         # knockout radius
+BADGE_r = 6.6         # badge artwork radius
+# Badge artwork was drafted against a 5.4 radius; K rescales it so the badge
+# size is one number to change.
+K = BADGE_r / 5.4
 
 def centerline(y, x0, x1, curl=None, arc_steps=90):
     pts = [(x0 + (x1 - x0) * i / 40, y) for i in range(41)]
@@ -76,15 +79,31 @@ def arc_stroke(c, R, a0_deg, a1_deg, h, steps=60):
 # by 36/1024 with optical tweaks: stroke width 3.4 (vs 2.67 true-scale) and
 # vertical rhythm 5.6 (vs 4.92 true-scale).
 S = 36.0 / 1024.0
-CY = 17.0          # optical center height of the middle gust
+# The gusts sit on the canvas centre. The glyph's mass is above its middle gust
+# (the top gust's curl reaches higher than the short bottom run drops), so CY is
+# carried below 18 to bring the group's own centre onto it.
+CY = 20.4          # optical center height of the middle gust
 RHYTHM = 5.6
-GUST_TOP = outline(centerline(CY - RHYTHM, 260 * S, 630 * S, curl=(88 * S, 252, "up")), h=1.7)
-GUST_BOT = outline(centerline(CY + RHYTHM, 260 * S, 494 * S, curl=None), h=1.7)
+STROKE_H = 1.45    # half stroke width
+GUST_TOP = outline(centerline(CY - RHYTHM, 260 * S, 630 * S, curl=(88 * S, 252, "up")), h=STROKE_H)
+GUST_BOT = outline(centerline(CY + RHYTHM, 260 * S, 494 * S, curl=None), h=STROKE_H)
 # Idle carries the full app-icon glyph. Badge states drop the middle gust's
-# curl (the knockout would amputate it into an orphaned fragment); its plain
-# run gets a clean cut at the knockout edge instead.
-GUSTS_FULL = [GUST_TOP, outline(centerline(CY, 210 * S, 710 * S, curl=(100 * S, 252, "down")), h=1.7), GUST_BOT]
-GUSTS_BADGED = [GUST_TOP, outline(centerline(CY, 210 * S, 710 * S, curl=None), h=1.7), GUST_BOT]
+# curl (the knockout would amputate it into an orphaned fragment) and stop its
+# plain run short of the badge, so it ends on its own round cap rather than on a
+# slice taken out of it by the mask.
+def clear_x(y, gap=0.35):
+    """Where a run at height y has to stop to leave the knockout alone."""
+    dy = abs(BADGE_C[1] - y)
+    need = BADGE_R + STROKE_H + gap
+    if need <= dy:
+        return None
+    return BADGE_C[0] - math.sqrt(need * need - dy * dy)
+
+MID_X1 = 710 * S
+MID_X1_BADGED = min(MID_X1, clear_x(CY) or MID_X1)
+
+GUSTS_FULL = [GUST_TOP, outline(centerline(CY, 210 * S, MID_X1, curl=(100 * S, 252, "down")), h=STROKE_H), GUST_BOT]
+GUSTS_BADGED = [GUST_TOP, outline(centerline(CY, 210 * S, MID_X1_BADGED, curl=None), h=STROKE_H), GUST_BOT]
 
 def svg(body, mask_badge=False):
     mask = ""
@@ -102,12 +121,12 @@ def svg(body, mask_badge=False):
 cx, cy, r = *BADGE_C, BADGE_r
 badges = {
     "idle": ("", False),
-    "syncing": (f'<path d="{arc_stroke((cx, cy), r - 1.4, -80, 155, 1.5)}" fill="#000"/>', True),
-    "paused": (f'<rect x="{cx-3.1:.1f}" y="{cy-3.6:.1f}" width="2.2" height="7.2" rx="1.1" fill="#000"/>'
-               f'<rect x="{cx+0.9:.1f}" y="{cy-3.6:.1f}" width="2.2" height="7.2" rx="1.1" fill="#000"/>', True),
-    "error": (f'<rect x="{cx-1.3:.1f}" y="{cy-4.4:.1f}" width="2.6" height="5.4" rx="1.3" fill="#000"/>'
-              f'<circle cx="{cx}" cy="{cy+3.2:.1f}" r="1.5" fill="#000"/>', True),
-    "offline": (f'<circle cx="{cx}" cy="{cy}" r="{r-1.2:.1f}" fill="none" stroke="#000" stroke-width="1.8"/>', True),
+    "syncing": (f'<path d="{arc_stroke((cx, cy), r - 1.4 * K, -80, 155, 1.5 * K)}" fill="#000"/>', True),
+    "paused": (f'<rect x="{cx-3.1*K:.1f}" y="{cy-3.6*K:.1f}" width="{2.2*K:.1f}" height="{7.2*K:.1f}" rx="{1.1*K:.1f}" fill="#000"/>'
+               f'<rect x="{cx+0.9*K:.1f}" y="{cy-3.6*K:.1f}" width="{2.2*K:.1f}" height="{7.2*K:.1f}" rx="{1.1*K:.1f}" fill="#000"/>', True),
+    "error": (f'<rect x="{cx-1.3*K:.1f}" y="{cy-4.4*K:.1f}" width="{2.6*K:.1f}" height="{5.4*K:.1f}" rx="{1.3*K:.1f}" fill="#000"/>'
+              f'<circle cx="{cx}" cy="{cy+3.2*K:.1f}" r="{1.5*K:.1f}" fill="#000"/>', True),
+    "offline": (f'<circle cx="{cx}" cy="{cy}" r="{r-1.2*K:.1f}" fill="none" stroke="#000" stroke-width="{1.8*K:.1f}"/>', True),
 }
 
 here = os.path.dirname(os.path.abspath(__file__))

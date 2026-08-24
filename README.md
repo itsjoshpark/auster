@@ -1,6 +1,6 @@
 # Auster
 
-<img src="design/AppIcon/preview@512.png" alt="Auster app icon" width="128" align="right"/>
+<img src="design/AppIcon/AppIcon-iOS-Default-256@1x.png" alt="Auster app icon" width="128" align="right"/>
 
 An open-source Dropbox sync client for macOS: a plain local folder (default
 `~/Dropbox`) kept in two-way sync with your Dropbox account, driven from a
