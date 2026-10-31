@@ -598,3 +598,20 @@ and agent edits easier. N1 still holds: the folders stay synchronized, and the
 building needs Xcode 27.2 or later, and so macOS Tahoe 26.6 or later. The
 deployment target is still macOS 15. CI and releases run on GitHub's `xcode-27`
 image with Xcode 27.2 selected, because `macos-26` tops out at Xcode 26.6.
+
+### N46. Release notes and versions come from Changie; builds go through fastlane
+The hand-written `.sparkle/notes/next.md` and the `bump-version.sh` and
+`project-version.sh` scripts are replaced by [Changie](https://changie.dev).
+Every user-facing change adds a fragment, and the release batches them into
+`.changes/<version>.md`, picks the bump from their kinds, and stamps
+`MARKETING_VERSION` into `Config/Shared.xcconfig`. Archive, export, the
+ephemeral keychain and notarization run through fastlane lanes. The other three
+apps (AudioBalance, Front Row, PeekForSafari) use the same setup, so all four
+release the same way.
+
+The rest of the flow is unchanged: Markdown rendered by cmark-gfm into the
+appcast, the guards, and publishing last. Two consequences follow. The build
+number is no longer written back, because Changie can only stamp the version.
+fastlane builds through the project's embedded workspace with profile
+detection skipped, because its `xcodeproj` gem can't read `project.xcproj`
+(N45).

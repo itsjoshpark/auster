@@ -32,6 +32,11 @@ in this repo.
 
 ## Building & testing
 
+Every user-facing change adds a [Changie](https://changie.dev) release-notes
+fragment in the same PR: `changie new --kind Fixed --body "…"` (kinds `New`,
+`Changed`, `Fixed`, `Updated`; see `.changes/README.md`). Releasing is in
+`docs/release-process.md`.
+
 Building needs Xcode 27.2 or later, on macOS Tahoe 26.6 or later: the project
 uses Xcode's JSON project format (`Auster.xcodeproj/project.xcproj`, see N45).
 

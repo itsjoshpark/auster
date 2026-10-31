@@ -145,13 +145,16 @@ else
     check "rejects a missing argument" pass
 fi
 
-# The committed template is what the workflow refuses to release with, but it
-# still has to render — the archived notes of every release start from it.
-if "$render" "$script_dir/../../.sparkle/notes/TEMPLATE.md" >/dev/null 2>&1; then
-    check "renders the committed notes template" pass
+# What Changie writes for a release (.changie.yaml): a list of "- Kind: body",
+# optionally under a free-text header.
+changie_notes="$(mktemp)"
+printf '**Note**: Read this first.\n\n- New: Something\n- Fixed: Something else\n' >"$changie_notes"
+if "$render" "$changie_notes" >/dev/null 2>&1; then
+    check "renders Changie's release notes format" pass
 else
-    check "renders the committed notes template" fail
+    check "renders Changie's release notes format" fail
 fi
+rm -f "$changie_notes"
 
 echo
 if ((failures > 0)); then
