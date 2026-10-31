@@ -11,7 +11,7 @@
 # CHANGELOG.md, and stamps MARKETING_VERSION into Config/Shared.xcconfig. The
 # notes go to GitHub as Markdown and to the appcast as HTML, rendered by
 # cmark-gfm so both read the same. The build number is the commit count; it is
-# passed to the build and never written back. fastlane (fastlane/Fastfile)
+# passed to the build and recorded in the xcconfig with the release commit. fastlane (fastlane/Fastfile)
 # imports the certificate, archives, exports, and notarizes.
 #
 # Nothing outside the runner is touched until notarization succeeds, so a failed
@@ -395,6 +395,12 @@ jobs:
           # Changie's batch and merge already ran: the fragments became
           # .changes/$version.md, CHANGELOG.md was regenerated, and the xcconfig
           # carries the new marketing version.
+          # Record the shipped build number too, so local builds report what last
+          # shipped. Changie stamps only the marketing version.
+          sed -i '' "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = ${{ steps.version.outputs.build }}/" "$CONFIG"
+          grep -qx "CURRENT_PROJECT_VERSION = ${{ steps.version.outputs.build }}" "$CONFIG" ||
+            { echo "::error::Could not record build ${{ steps.version.outputs.build }} in $CONFIG"; exit 1; }
+
           git add -A .sparkle/appcast.xml .changes CHANGELOG.md "$CONFIG"
           git commit -m "chore: release $version (${{ steps.version.outputs.build }}) [skip ci]"
 

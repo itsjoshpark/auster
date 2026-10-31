@@ -30,8 +30,8 @@ newlines:
   beforeChangelogVersion: 1
   endOfVersion: 1
 # Applied by `changie merge`: the marketing version lives in the shared xcconfig.
-# The build number is the commit count and is passed to the build, never
-# written back.
+# The build number is the commit count; the release workflow records it
+# separately.
 replacements:
   - path: Config/Shared.xcconfig
     find: '^MARKETING_VERSION = .*$'
