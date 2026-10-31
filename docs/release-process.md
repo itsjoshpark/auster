@@ -42,7 +42,7 @@ To run the lanes locally, install the gems outside the repository, because
   `git rev-list --count HEAD` — the commit count. Sparkle compares *this* to
   decide whether an update is newer, which is why the checkout uses
   `fetch-depth: 0`: a shallow clone counts 1, and a release numbered 1 would be
-  offered to nobody, ever. It is passed to the build and not written back.
+  offered to nobody, ever. It is passed to the build and recorded in the xcconfig by the release commit.
 
 ## What stops a bad release
 

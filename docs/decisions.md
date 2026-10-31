@@ -610,8 +610,8 @@ apps (AudioBalance, Front Row, PeekForSafari) use the same setup, so all four
 release the same way.
 
 The rest of the flow is unchanged: Markdown rendered by cmark-gfm into the
-appcast, the guards, and publishing last. Two consequences follow. The build
-number is no longer written back, because Changie can only stamp the version.
+appcast, the guards, and publishing last. Changie stamps only the marketing
+version, so the release commit records the build number with a one-line `sed`.
 fastlane builds through the project's embedded workspace with profile
 detection skipped, because its `xcodeproj` gem can't read `project.xcproj`
 (N45).
