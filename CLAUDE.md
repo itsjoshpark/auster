@@ -32,6 +32,9 @@ in this repo.
 
 ## Building & testing
 
+Building needs Xcode 27.2 or later, on macOS Tahoe 26.6 or later: the project
+uses Xcode's JSON project format (`Auster.xcodeproj/project.xcproj`, see N45).
+
 ```sh
 # AusterCore's tests, then an ad-hoc-signed build of the app. This is the
 # command to run locally.

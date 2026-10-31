@@ -1,0 +1,143 @@
+{
+  "default-configuration": "Release",
+  "configurations": [
+    { "name": "Debug", "file": "Config/Shared.xcconfig" },
+    { "name": "Release", "file": "Config/Shared.xcconfig" },
+  ],
+  "localizations": {
+    "development": "en",
+    "supported": [
+      "Base",
+    ],
+  },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "AusterCore",
+    }, {
+      "kind": "remote",
+      "repository": "https://github.com/sparkle-project/Sparkle",
+      "version": {
+        "up-to-next-major-version": "2.9.6",
+      },
+    },
+  ],
+  "files": [
+    {
+      "kind": "group",
+      "path": "Config",
+      "children": [
+        { "path": "Shared.xcconfig" },
+        { "path": "Secrets.xcconfig.template" },
+      ],
+    }, {
+      "kind": "folder",
+      "path": "Auster",
+      "target-membership": [
+        "Auster",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "Auster",
+          "exclusions": [
+            "Resources/Info.plist",
+          ],
+        },
+      ],
+    },
+    { "kind": "folder", "path": "AusterTests", "target-membership": [ "AusterTests" ] },
+    {
+      "kind": "group",
+      "name": "Products",
+      "children": [
+        { "path": "<PRODUCTS>/Auster.app", "id": "1A0000000000000000000007", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/AusterTests.xctest", "id": "1A0000000000000000000022", "type": "wrapper.cfbundle", "index": false },
+      ],
+    },
+  ],
+  "targets": [
+    {
+      "name": "Auster",
+      "id": "1A0000000000000000000006",
+      "product": "Products/Auster.app",
+      "product-type": "application",
+      "specialized-configurations": [
+        { "name": "Debug", "file": "Config/Shared.xcconfig" },
+        { "name": "Release", "file": "Config/Shared.xcconfig" },
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "package-product-members": [
+        {
+          "product-name": "AusterCore",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "Sparkle",
+          "product-name": "Sparkle",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+      "build-settings": {
+        "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+        "COMBINE_HIDPI_IMAGES": "YES",
+        "GENERATE_INFOPLIST_FILE": "NO",
+        "INFOPLIST_FILE": "Auster/Resources/Info.plist",
+        "LD_RUNPATH_SEARCH_PATHS": [
+          "$(inherited)",
+          "@executable_path/../Frameworks",
+        ],
+        "PRODUCT_BUNDLE_IDENTIFIER": "com.itsjoshpark.Auster",
+        "PRODUCT_NAME": "$(TARGET_NAME)",
+      },
+    }, {
+      "name": "AusterTests",
+      "id": "1A0000000000000000000021",
+      "product": "Products/AusterTests.xctest",
+      "product-type": "bundle.unit-test",
+      "test-host-target": "Auster",
+      "specialized-configurations": [
+        { "name": "Debug", "file": "Config/Shared.xcconfig" },
+        { "name": "Release", "file": "Config/Shared.xcconfig" },
+      ],
+      "dependencies": [
+        "Auster",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "build-settings": {
+        "BUNDLE_LOADER": "$(TEST_HOST)",
+        "GENERATE_INFOPLIST_FILE": "YES",
+        "PRODUCT_BUNDLE_IDENTIFIER": "com.itsjoshpark.AusterTests",
+        "PRODUCT_NAME": "$(TARGET_NAME)",
+        "TEST_HOST": "$(BUILT_PRODUCTS_DIR)/Auster.app/Contents/MacOS/Auster",
+      },
+    },
+  ],
+  "build-settings": {
+    "COPY_PHASE_STRIP": "NO",
+    "DEBUG_INFORMATION_FORMAT[config=Debug]": "dwarf",
+    "DEBUG_INFORMATION_FORMAT[config=Release]": "dwarf-with-dsym",
+    "ENABLE_NS_ASSERTIONS[config=Release]": "NO",
+    "ENABLE_TESTABILITY[config=Debug]": "YES",
+    "GCC_OPTIMIZATION_LEVEL[config=Debug]": "0",
+    "GCC_PREPROCESSOR_DEFINITIONS[config=Debug]": [
+      "DEBUG=1",
+      "$(inherited)",
+    ],
+    "MTL_ENABLE_DEBUG_INFO[config=Debug]": "INCLUDE_SOURCE",
+    "MTL_ENABLE_DEBUG_INFO[config=Release]": "NO",
+    "ONLY_ACTIVE_ARCH[config=Debug]": "YES",
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Debug]": "DEBUG $(inherited)",
+    "SWIFT_COMPILATION_MODE[config=Release]": "wholemodule",
+    "SWIFT_OPTIMIZATION_LEVEL[config=Debug]": "-Onone",
+    "VALIDATE_PRODUCT[config=Release]": "YES",
+  },
+  "last-upgrade": "26.0",
+  "last-swift-update": "26.0",
+}

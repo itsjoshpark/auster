@@ -26,7 +26,8 @@ team/business accounts.
 ## Requirements
 
 - macOS 15 (Sequoia) or later
-- Xcode 26+ to build
+- Xcode 27.2 or later to build, on macOS Tahoe 26.6 or later (the project uses
+  Xcode's JSON project format, `project.xcproj`)
 - A Dropbox API app key (development builds; see
   `Config/Secrets.xcconfig.template`)
 
