@@ -587,3 +587,14 @@ different message is still news, standing issues remain listed in the
 sync-issues window either way, and issues carried over from the last run are
 seeded into that set at startup — a relaunch is not a reason to report them all
 again.
+
+### N45. The project file uses Xcode's JSON format
+`Auster.xcodeproj/project.pbxproj` was converted to Xcode's JSON project
+format, `Auster.xcodeproj/project.xcproj`
+(`xcodebuild -convert-project "Xcode Project"`). The file is about a third the
+size, and a diff of it matches the change made in Xcode, which makes review
+and agent edits easier. N1 still holds: the folders stay synchronized, and the
+`Info.plist` exception is now a `membership-exceptions` entry. The cost is that
+building needs Xcode 27.2 or later, and so macOS Tahoe 26.6 or later. The
+deployment target is still macOS 15. CI and releases run on GitHub's `xcode-27`
+image with Xcode 27.2 selected, because `macos-26` tops out at Xcode 26.6.
