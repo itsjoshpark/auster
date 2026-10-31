@@ -1,6 +1,6 @@
 #!/bin/bash
 # render-notes.sh — render Markdown release notes as an HTML fragment.
-#   render-notes.sh .sparkle/notes/next.md  ->  <ul>\n<li>New: …</li>\n</ul>
+#   render-notes.sh notes.md  ->  <ul>\n<li>New: …</li>\n</ul>
 # Output is indented to sit inside the appcast's <description> CDATA.
 
 set -euo pipefail

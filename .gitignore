@@ -140,3 +140,8 @@ Auster.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
 ## Python — the icon generators are run in place
 __pycache__/
 *.py[cod]
+
+## fastlane — install gems outside the repository (see CLAUDE.md), so
+## `swift-format lint -r ./` never finds the fastlane gem's Swift files
+.bundle/
+fastlane/README.md
